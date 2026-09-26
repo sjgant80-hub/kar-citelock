@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CiteLock — Deterministic Quote Verifier</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --panel2:#171c22; --border:#232a32;
+    --text:#e6edf3; --muted:#8b98a5; --accent:#5fd6c9; --accent2:#3fa89b;
+    --good:#3fb950; --good-bg:#0f2a17; --warn:#d29922; --warn-bg:#2b2107;
+    --bad:#f85149; --bad-bg:#2b0f0f; --focus:#5fd6c9;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:20px 16px 60px;}
+  header{padding:18px 0 6px;}
+  header h1{margin:0;font-size:28px;letter-spacing:0.5px;}
+  header h1 .lock{color:var(--accent);}
+  header .tag{color:var(--muted);font-size:14px;margin-top:4px;}
+  a{color:var(--accent);}
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    padding:16px; margin:14px 0;
+  }
+  .panel h2{margin:0 0 8px;font-size:16px;color:var(--text);}
+  .panel h2 .n{color:var(--muted);font-weight:400;font-size:12px;}
+  .muted{color:var(--muted);}
+  .small{font-size:12px;}
+  p{margin:8px 0;}
+  .intro p{color:#c7d1db;}
+  .limits{border-top:1px dashed var(--border);margin-top:12px;padding-top:10px;font-size:13px;color:var(--muted);}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;}
+  input[type=text], textarea, select{
+    width:100%; background:var(--panel2); color:var(--text); border:1px solid var(--border);
+    border-radius:7px; padding:9px 10px; font-family:inherit; font-size:14px;
+  }
+  input[type=text]:focus, textarea:focus, select:focus{outline:2px solid var(--focus);outline-offset:1px;}
+  textarea{resize:vertical;min-height:64px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;}
+  .row > div{flex:1;min-width:180px;}
+  button{
+    background:var(--accent); color:#062018; border:none; border-radius:7px;
+    padding:9px 14px; font-size:14px; font-weight:600; cursor:pointer;
+  }
+  button:hover{background:var(--accent2);color:#fff;}
+  button.ghost{background:transparent;border:1px solid var(--border);color:var(--text);font-weight:500;}
+  button.ghost:hover{background:var(--panel2);color:var(--text);}
+  button.small-btn{padding:5px 9px;font-size:12px;}
+  button:disabled{opacity:0.45;cursor:not-allowed;background:var(--border);color:var(--muted);}
+  .btnbar{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center;}
+  .err{color:var(--bad);font-size:12px;margin-top:6px;min-height:14px;}
+  .list-item{
+    border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-top:8px;
+    background:var(--panel2); display:flex; justify-content:space-between; gap:10px; align-items:flex-start;
+  }
+  .list-item .meta{font-size:12px;color:var(--muted);margin-top:4px;word-break:break-all;}
+  .list-item .body{flex:1;min-width:0;}
+  .list-item .qtext{font-size:13px;color:#dce4ec;white-space:pre-wrap;}
+  .list-item .lbl{font-weight:600;font-size:14px;}
+  .empty-note{color:var(--muted);font-size:13px;font-style:italic;padding:6px 2px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--border);vertical-align:top;}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;}
+  .tablewrap{overflow-x:auto;}
+  .excerpt{font-size:12px;color:var(--muted);}
+  .badge{
+    display:inline-block;padding:3px 8px;border-radius:99px;font-size:11px;font-weight:700;
+    letter-spacing:0.03em;white-space:nowrap;
+  }
+  .badge.VERIFIED{background:var(--good-bg);color:var(--good);}
+  .badge.NEAR_MATCH{background:var(--warn-bg);color:var(--warn);}
+  .badge.NOT_FOUND{background:var(--bad-bg);color:var(--bad);}
+  .badge.SOURCE_MISSING{background:var(--bad-bg);color:var(--bad);}
+  .badge.EMPTY{background:var(--border);color:var(--muted);}
+  .summaryline{font-size:13px;color:#c7d1db;margin-bottom:8px;}
+  .hashbox{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px;
+    background:var(--panel2); border:1px solid var(--border); border-radius:7px; padding:10px;
+    word-break:break-all; color:var(--accent);
+  }
+  textarea.mono, pre.mono{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;
+  }
+  pre.mono{white-space:pre-wrap;word-break:break-all;background:var(--panel2);border:1px solid var(--border);
+    border-radius:7px;padding:10px;max-height:220px;overflow:auto;margin:0;}
+  .copybar{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;}
+  .copied-flag{font-size:12px;color:var(--good);opacity:0;transition:opacity .15s;}
+  .copied-flag.show{opacity:1;}
+  footer{margin-top:24px;color:var(--muted);font-size:12px;border-top:1px solid var(--border);padding-top:14px;}
+  .hidden{display:none !important;}
+  .divider{height:1px;background:var(--border);margin:12px 0;}
+  .threshold-note{font-size:11px;color:var(--muted);}
+  @media (max-width:600px){
+    header h1{font-size:22px;}
+    .btnbar button{flex:1;}
+    .list-item{flex-direction:column;}
+    th,td{padding:6px 5px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1><span class="lock">CiteLock</span></h1>
+    <div class="tag">Deterministic, third-party re-runnable quote &amp; citation verification. No LLM judge — just string matching and SHA-256.</div>
+  </header>
+
+  <section class="panel intro">
+    <p>Paste one or more source documents, then list the quotes an AI (or a person) claims come from
+    them. CiteLock checks each claimed quote against its source using plain substring search and
+    Levenshtein similarity — the same algorithm every time, inline in this page's own source code —
+    and classifies it as <strong>VERIFIED</strong> (exact, after whitespace/quote-mark normalization),
+    <strong>NEAR MATCH</strong> (a close but altered passage — an edited or paraphrased quote), or
+    <strong>NOT FOUND</strong> (no matching passage exists in that source at all). The run ends with a
+    SHA-256 receipt hash: give the same sources and the same claims to anyone, anywhere, and this exact
+    algorithm produces the exact same hash — that is what "provable" means here, nothing more mystical
+    than that.</p>
+    <div class="limits">
+      <strong>Honest limits.</strong> CiteLock only checks whether text is present in the source
+      <em>you</em> supplied — it cannot tell you whether that source is authentic, unaltered, or
+      really says elsewhere what it appears to say here. It has no understanding of meaning, so a
+      verbatim quote can still be misleading out of context. Matching is case-sensitive; only
+      whitespace, curly quotes/dashes and unicode form are normalized before comparing
+      <span class="threshold-note">(passages ≥90% similar but not exact are labelled NEAR MATCH)</span>.
+      Quotes under three words can't be reliably fuzzy-matched. Nothing you type is sent anywhere or
+      saved anywhere — this page runs entirely in your browser, offline, and reloading it clears
+      everything.
+    </div>
+  </section>
+
+  <div class="btnbar">
+    <button id="demoBtn" class="ghost" type="button">Load demo (shows a verified, a tampered, and a fabricated quote)</button>
+    <button id="clearAllBtn" class="ghost" type="button">Clear everything</button>
+  </div>
+
+  <section class="panel" id="sourcesPanel">
+    <h2>1 · Source documents <span class="n" id="sourceCount">(0)</span></h2>
+    <form id="sourceForm">
+      <label for="srcLabel">Label</label>
+      <input type="text" id="srcLabel" placeholder="e.g. Interview transcript, p.4">
+      <label for="srcText">Source text</label>
+      <textarea id="srcText" placeholder="Paste the full source document text here…" rows="4"></textarea>
+      <div class="btnbar">
+        <button type="submit">Add source</button>
+      </div>
+      <div class="err" id="srcErr"></div>
+    </form>
+    <div id="sourceList"></div>
+  </section>
+
+  <section class="panel" id="claimsPanel">
+    <h2>2 · Claimed quotes <span class="n" id="claimCount">(0)</span></h2>
+    <form id="claimForm">
+      <div class="row">
+        <div>
+          <label for="claimSource">Claimed source</label>
+          <select id="claimSource"><option value="">— add a source first —</option></select>
+        </div>
+        <div>
+          <label for="claimLocator">Locator (optional, not verified)</label>
+          <input type="text" id="claimLocator" placeholder="e.g. page 3 / 00:45">
+        </div>
+      </div>
+      <label for="claimText">Quoted text as claimed</label>
+      <textarea id="claimText" placeholder="Paste the exact quote being attributed to the source above…" rows="3"></textarea>
+      <div class="btnbar">
+        <button type="submit">Add claim</button>
+      </div>
+      <div class="err" id="claimErr"></div>
+    </form>
+    <div id="claimList"></div>
+  </section>
+
+  <div class="btnbar">
+    <button id="runBtn" type="button" disabled>Run verification</button>
+    <span class="small muted" id="runStatus"></span>
+  </div>
+
+  <section class="panel hidden" id="resultsPanel">
+    <h2>3 · Results</h2>
+    <div class="summaryline" id="resultsSummary"></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Source</th><th>Quote (as claimed)</th><th>Verdict</th><th>Similarity</th><th>Closest passage in source</th></tr></thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel hidden" id="receiptPanel">
+    <h2>4 · Verification receipt</h2>
+    <p class="small muted">This is the SHA-256 hash of a canonical JSON payload built from every
+    source's hash, every claim, and every verdict above — no timestamp, no randomness. Anyone who
+    runs the same sources and claims through this same page (open-view-source, it's one file) will
+    get this exact hash back.</p>
+    <div class="hashbox" id="receiptHash"></div>
+    <div class="copybar">
+      <button type="button" class="ghost small-btn" id="copyHashBtn">Copy hash</button>
+      <button type="button" class="ghost small-btn" id="toggleJsonBtn">Show canonical JSON</button>
+      <span class="copied-flag" id="copiedFlag">copied</span>
+    </div>
+    <pre class="mono hidden" id="receiptJson"></pre>
+  </section>
+
+  <section class="panel hidden" id="ledgerPanel">
+    <h2>5 · Session ledger <span class="n">(hash-chained audit trail of every run this session)</span></h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>#</th><th>Time</th><th>Summary</th><th>Receipt hash</th><th>Chain hash</th></tr></thead>
+        <tbody id="ledgerBody"></tbody>
+      </table>
+    </div>
+    <div class="btnbar">
+      <button type="button" class="ghost small-btn" id="exportLedgerBtn">Export ledger (JSON)</button>
+      <label class="ghost small-btn" style="display:inline-flex;align-items:center;cursor:pointer;">
+        Import &amp; verify a ledger file
+        <input type="file" id="importLedgerInput" accept="application/json" style="display:none;">
+      </label>
+    </div>
+    <div class="small muted" id="ledgerImportResult" style="margin-top:8px;"></div>
+    <p class="small muted" style="margin-top:8px;">Each entry's chain hash covers the previous
+    entry's chain hash, this run's receipt hash, and this run's verdict summary. Export the ledger,
+    hand-edit any field in the file, and re-import it — the mismatch is what "tamper-evident" means
+    here: nothing more than a hash that no longer recomputes.</p>
+  </section>
+
+  <section class="panel" id="hashcheckPanel">
+    <h2>Independent hash check</h2>
+    <p class="small muted">Not part of the workflow above — a standalone SHA-256 box so you can
+    confirm, with your own eyes, that this page uses nothing but the browser's built-in
+    <code>crypto.subtle.digest</code>. Paste the canonical JSON from the receipt above (or literally
+    any text) here, or into any other SHA-256 tool, and compare.</p>
+    <textarea id="hashInput" class="mono" rows="4" placeholder="Paste text to hash…"></textarea>
+    <div class="btnbar">
+      <button type="button" class="ghost" id="hashComputeBtn">Compute SHA-256</button>
+    </div>
+    <div class="hashbox" id="hashOutput" style="margin-top:8px;">—</div>
+  </section>
+
+  <footer>
+    CiteLock · kar-citelock · a FallForge estate build. Single static file, no network calls, no
+    accounts, no pricing. Verifies quote-to-source grounding only — it is one deterministic check
+    among many you should run, not a full fact-check.
+  </footer>
+
+</div>
+
+<script>
+'use strict';
+
+/* ---------- constants ---------- */
+var ALGO_VERSION = 'citelock-v1';
+var NEAR_THRESHOLD = 0.90;
+var ZERO_HASH = '0'.repeat(64);
+
+/* ---------- state ---------- */
+var state = {
+  sources: [],   // {id, label, norm, hash, length}
+  claims: [],    // {id, sourceLabel, quoteRaw, locator}
+  results: null, // parallel to claims: {verdict, similarity, excerpt}
+  receipt: null, // {payload, json, hash}
+  ledger: []     // {n, ts, summary, receiptHash, prevChainHash, chainHash}
+};
+var uidCounter = 0;
+function uid(){ uidCounter += 1; return 'id' + uidCounter + '_' + Math.random().toString(36).slice(2,8); }
+
+/* ---------- text normalization ---------- */
+function normalize(s){
+  if (typeof s !== 'string') return '';
+  var out = s;
+  try { out = out.normalize('NFKC'); } catch(e){ /* older engines: skip */ }
+  out = out
+    .replace(/[‘’‛′]/g, "'")
+    .replace(/[“”‟″]/g, '"')
+    .replace(/[–—]/g, '-')
+    .replace(/ /g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return out;
+}
+
+/* ---------- hashing ---------- */
+function hasSubtle(){
+  return !!(window.crypto && window.crypto.subtle && window.crypto.subtle.digest);
+}
+async function sha256Hex(str){
+  if (!hasSubtle()) throw new Error('Web Crypto (crypto.subtle) is not available in this context.');
+  var enc = new TextEncoder().encode(str);
+  var buf = await window.crypto.subtle.digest('SHA-256', enc);
+  var bytes = new Uint8Array(buf);
+  var hex = '';
+  for (var i=0;i<bytes.length;i++){ hex += bytes[i].toString(16).padStart(2,'0'); }
+  return hex;
+}
+
+/* ---------- canonical JSON ---------- */
+function canonicalize(obj){
+  if (Array.isArray(obj)) return obj.map(canonicalize);
+  if (obj && typeof obj === 'object'){
+    var out = {};
+    Object.keys(obj).sort().forEach(function(k){ out[k] = canonicalize(obj[k]); });
+    return out;
+  }
+  return obj;
+}
+function canonicalJSON(obj){ return JSON.stringify(canonicalize(obj)); }
+
+/* ---------- matching algorithm ---------- */
+function levenshtein(a, b){
+  var al = a.length, bl = b.length;
+  if (al === 0) return bl;
+  if (bl === 0) return al;
+  var prev = new Array(bl+1);
+  for (var j=0;j<=bl;j++) prev[j] = j;
+  for (var i=1;i<=al;i++){
+    var cur = new Array(bl+1);
+    cur[0] = i;
+    var ca = a.charCodeAt(i-1);
+    for (var j2=1;j2<=bl;j2++){
+      var cost = (ca === b.charCodeAt(j2-1)) ? 0 : 1;
+      var del = prev[j2] + 1;
+      var ins = cur[j2-1] + 1;
+      var sub = prev[j2-1] + cost;
+      cur[j2] = Math.min(del, ins, sub);
+    }
+    prev = cur;
+  }
+  return prev[bl];
+}
+function similarity(a, b){
+  var maxLen = Math.max(a.length, b.length);
+  if (maxLen === 0) return 1;
+  return 1 - (levenshtein(a,b) / maxLen);
+}
+
+function findAnchor(quote, sourceNorm){
+  var words = quote.split(' ').filter(function(w){ return w.length > 0; });
+  var maxLen = Math.min(words.length, 8);
+  for (var len = maxLen; len >= 3; len--){
+    for (var start = 0; start + len <= words.length; start++){
+      var phrase = words.slice(start, start+len).join(' ');
+      var idx = sourceNorm.indexOf(phrase);
+      if (idx !== -1){
+        var quoteOffset = quote.indexOf(phrase);
+        if (quoteOffset === -1) quoteOffset = 0;
+        return { sourceIdx: idx, quoteOffset: quoteOffset, phrase: phrase };
+      }
+    }
+  }
+  return null;
+}
+
+function contextSnippet(norm, idx, len, pad){
+  pad = pad || 30;
+  var start = Math.max(0, idx - pad);
+  var end = Math.min(norm.length, idx + len + pad);
+  var s = norm.slice(start, end);
+  if (start > 0) s = '…' + s;
+  if (end < norm.length) s = s + '…';
+  return s;
+}
+
+function verifyClaim(quoteRaw, src){
+  var quote = normalize(quoteRaw);
+  if (!quote) return { verdict:'EMPTY', similarity:0, excerpt:'' };
+
+  var idx = src.norm.indexOf(quote);
+  if (idx !== -1){
+    return { verdict:'VERIFIED', similarity:1, excerpt: contextSnippet(src.norm, idx, quote.length) };
+  }
+
+  var anchor = findAnchor(quote, src.norm);
+  if (!anchor){
+    return { verdict:'NOT_FOUND', similarity:0, excerpt:'' };
+  }
+
+  var baseIdx = anchor.sourceIdx - anchor.quoteOffset;
+  var best = null;
+  for (var off = -20; off <= 20; off += 4){
+    var start = Math.max(0, Math.min(src.norm.length, baseIdx + off));
+    var end = Math.max(0, Math.min(src.norm.length, start + quote.length));
+    var windowText = src.norm.slice(start, end);
+    if (!windowText) continue;
+    var sim = similarity(quote, windowText);
+    if (!best || sim > best.sim) best = { sim: sim, idx: start };
+  }
+  if (!best) return { verdict:'NOT_FOUND', similarity:0, excerpt:'' };
+
+  var verdict = best.sim >= NEAR_THRESHOLD ? 'NEAR_MATCH' : 'NOT_FOUND';
+  return {
+    verdict: verdict,
+    similarity: best.sim,
+    excerpt: contextSnippet(src.norm, best.idx, quote.length)
+  };
+}
+
+/* ---------- DOM refs ---------- */
+var $ = function(id){ return document.getElementById(id); };
+var sourceForm = $('sourceForm'), srcLabel = $('srcLabel'), srcText = $('srcText'), srcErr = $('srcErr');
+var claimForm = $('claimForm'), claimSource = $('claimSource'), claimLocator = $('claimLocator'),
+    claimText = $('claimText'), claimErr = $('claimErr');
+var runBtn = $('runBtn'), runStatus = $('runStatus');
+
+/* ---------- rendering ---------- */
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+  });
+}
+
+function renderSources(){
+  $('sourceCount').textContent = '(' + state.sources.length + ')';
+  var list = $('sourceList');
+  if (state.sources.length === 0){
+    list.innerHTML = '<div class="empty-note">No sources yet.</div>';
+    return;
+  }
+  list.innerHTML = state.sources.map(function(s){
+    return '<div class="list-item">' +
+      '<div class="body">' +
+        '<div class="lbl">' + escapeHtml(s.label) + '</div>' +
+        '<div class="meta">' + s.length + ' normalized characters · sha256 ' + s.hash.slice(0,16) + '…</div>' +
+      '</div>' +
+      '<button type="button" class="ghost small-btn" data-remove-source="' + s.id + '">Remove</button>' +
+    '</div>';
+  }).join('');
+}
+
+function renderClaimSourceOptions(){
+  var current = claimSource.value;
+  var opts = state.sources.map(function(s){
+    return '<option value="' + escapeHtml(s.label) + '">' + escapeHtml(s.label) + '</option>';
+  });
+  claimSource.innerHTML = state.sources.length
+    ? opts.join('')
+    : '<option value="">— add a source first —</option>';
+  if (state.sources.some(function(s){ return s.label === current; })) claimSource.value = current;
+}
+
+function renderClaims(){
+  $('claimCount').textContent = '(' + state.claims.length + ')';
+  var list = $('claimList');
+  if (state.claims.length === 0){
+    list.innerHTML = '<div class="empty-note">No claimed quotes yet.</div>';
+    return;
+  }
+  list.innerHTML = state.claims.map(function(c){
+    var missing = !state.sources.some(function(s){ return s.label === c.sourceLabel; });
+    return '<div class="list-item">' +
+      '<div class="body">' +
+        '<div class="lbl">' + escapeHtml(c.sourceLabel) + (missing ? ' <span style="color:var(--bad);font-size:11px;">(source removed)</span>' : '') +
+          (c.locator ? ' <span class="meta">— ' + escapeHtml(c.locator) + '</span>' : '') + '</div>' +
+        '<div class="qtext">&ldquo;' + escapeHtml(c.quoteRaw) + '&rdquo;</div>' +
+      '</div>' +
+      '<button type="button" class="ghost small-btn" data-remove-claim="' + c.id + '">Remove</button>' +
+    '</div>';
+  }).join('');
+}
+
+function updateRunButton(){
+  runBtn.disabled = !(state.sources.length > 0 && state.claims.length > 0);
+}
+
+function badge(verdict){
+  var label = verdict === 'NOT_FOUND' ? 'NOT FOUND'
+    : verdict === 'NEAR_MATCH' ? 'NEAR MATCH'
+    : verdict === 'SOURCE_MISSING' ? 'SOURCE MISSING'
+    : verdict;
+  return '<span class="badge ' + verdict + '">' + label + '</span>';
+}
+
+function renderResults(){
+  var panel = $('resultsPanel');
+  panel.classList.remove('hidden');
+  var counts = {};
+  state.results.forEach(function(r){ counts[r.verdict] = (counts[r.verdict]||0)+1; });
+  var parts = Object.keys(counts).map(function(k){ return counts[k] + ' ' + k.replace('_',' '); });
+  $('resultsSummary').textContent = state.claims.length + ' claim(s) checked — ' + parts.join(', ') + '.';
+
+  var body = $('resultsBody');
+  body.innerHTML = state.claims.map(function(c, i){
+    var r = state.results[i];
+    var simText = (r.verdict === 'VERIFIED') ? '100%'
+      : (r.verdict === 'EMPTY' || r.verdict === 'SOURCE_MISSING' || r.verdict === 'NOT_FOUND' && r.similarity === 0) ? '—'
+      : (Math.round(r.similarity*1000)/10) + '%';
+    return '<tr>' +
+      '<td>' + escapeHtml(c.sourceLabel) + '</td>' +
+      '<td>' + escapeHtml(c.quoteRaw.length > 90 ? c.quoteRaw.slice(0,90)+'…' : c.quoteRaw) + '</td>' +
+      '<td>' + badge(r.verdict) + '</td>' +
+      '<td>' + simText + '</td>' +
+      '<td class="excerpt">' + (r.excerpt ? escapeHtml(r.excerpt) : '—') + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function renderReceiptPanel(){
+  $('receiptPanel').classList.remove('hidden');
+  $('receiptHash').textContent = state.receipt.hash;
+  $('receiptJson').textContent = state.receipt.json;
+}
+
+function summarizeResults(){
+  var counts = {};
+  state.results.forEach(function(r){ counts[r.verdict] = (counts[r.verdict]||0)+1; });
+  return Object.keys(counts).sort().map(function(k){ return k + ':' + counts[k]; }).join('|');
+}
+
+function renderLedger(){
+  $('ledgerPanel').classList.remove('hidden');
+  var body = $('ledgerBody');
+  body.innerHTML = state.ledger.map(function(e){
+    return '<tr>' +
+      '<td>' + e.n + '</td>' +
+      '<td>' + new Date(e.ts).toLocaleTimeString() + '</td>' +
+      '<td>' + escapeHtml(e.summary) + '</td>' +
+      '<td class="excerpt">' + e.receiptHash.slice(0,16) + '…</td>' +
+      '<td class="excerpt">' + e.chainHash.slice(0,16) + '…</td>' +
+    '</tr>';
+  }).join('');
+}
+
+/* ---------- receipt + ledger building ---------- */
+async function buildReceipt(){
+  var sortedSources = state.sources.slice().sort(function(a,b){ return a.label < b.label ? -1 : a.label > b.label ? 1 : 0; });
+  var claimRows = state.claims.map(function(c, i){
+    var r = state.results[i];
+    return {
+      source: c.sourceLabel,
+      quote: normalize(c.quoteRaw),
+      locator: c.locator || '',
+      verdict: r.verdict,
+      similarity: (typeof r.similarity === 'number' ? r.similarity : 0).toFixed(4)
+    };
+  }).sort(function(a,b){
+    var ka = a.source + '\u0000' + a.quote + '\u0000' + a.locator;
+    var kb = b.source + '\u0000' + b.quote + '\u0000' + b.locator;
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
+  var payload = {
+    algorithm: ALGO_VERSION,
+    nearThreshold: NEAR_THRESHOLD.toFixed(2),
+    sources: sortedSources.map(function(s){ return { label: s.label, sha256: s.hash, length: s.length }; }),
+    claims: claimRows
+  };
+  var json = canonicalJSON(payload);
+  var hash = await sha256Hex(json);
+  state.receipt = { payload: payload, json: json, hash: hash };
+}
+
+async function appendLedger(){
+  var prevChainHash = state.ledger.length ? state.ledger[state.ledger.length-1].chainHash : ZERO_HASH;
+  var summary = summarizeResults();
+  var chainInput = prevChainHash + ':' + state.receipt.hash + ':' + summary;
+  var chainHash = await sha256Hex(chainInput);
+  state.ledger.push({
+    n: state.ledger.length + 1,
+    ts: new Date().toISOString(),
+    summary: summary,
+    receiptHash: state.receipt.hash,
+    prevChainHash: prevChainHash,
+    chainHash: chainHash
+  });
+}
+
+/* ---------- event wiring ---------- */
+sourceForm.addEventListener('submit', async function(ev){
+  ev.preventDefault();
+  srcErr.textContent = '';
+  var label = srcLabel.value.trim();
+  var text = srcText.value;
+  if (!label){ srcErr.textContent = 'Give this source a label.'; return; }
+  if (state.sources.some(function(s){ return s.label === label; })){ srcErr.textContent = 'That label is already used — pick a unique one.'; return; }
+  var norm = normalize(text);
+  if (!norm){ srcErr.textContent = 'Paste the source text.'; return; }
+  var hash;
+  try { hash = await sha256Hex(norm); }
+  catch(e){ srcErr.textContent = 'Could not hash this source: ' + e.message; return; }
+  state.sources.push({ id: uid(), label: label, norm: norm, hash: hash, length: norm.length });
+  srcLabel.value = ''; srcText.value = '';
+  renderSources(); renderClaimSourceOptions(); updateRunButton();
+});
+
+claimForm.addEventListener('submit', function(ev){
+  ev.preventDefault();
+  claimErr.textContent = '';
+  var sourceLabel = claimSource.value;
+  var text = claimText.value;
+  var locator = claimLocator.value.trim();
+  if (!sourceLabel){ claimErr.textContent = 'Add a source first, then pick it here.'; return; }
+  if (!text.trim()){ claimErr.textContent = 'Paste the quote being claimed.'; return; }
+  state.claims.push({ id: uid(), sourceLabel: sourceLabel, quoteRaw: text.trim(), locator: locator });
+  claimText.value = ''; claimLocator.value = '';
+  renderClaims(); updateRunButton();
+});
+
+document.addEventListener('click', function(ev){
+  var rs = ev.target.getAttribute && ev.target.getAttribute('data-remove-source');
+  if (rs){
+    state.sources = state.sources.filter(function(s){ return s.id !== rs; });
+    renderSources(); renderClaimSourceOptions(); renderClaims(); updateRunButton();
+    return;
+  }
+  var rc = ev.target.getAttribute && ev.target.getAttribute('data-remove-claim');
+  if (rc){
+    state.claims = state.claims.filter(function(c){ return c.id !== rc; });
+    renderClaims(); updateRunButton();
+    return;
+  }
+});
+
+runBtn.addEventListener('click', async function(){
+  if (state.sources.length === 0 || state.claims.length === 0) return;
+  runBtn.disabled = true;
+  runStatus.textContent = 'Running…';
+  try{
+    var results = state.claims.map(function(c){
+      var src = state.sources.find(function(s){ return s.label === c.sourceLabel; });
+      if (!src) return { verdict:'SOURCE_MISSING', similarity:0, excerpt:'' };
+      return verifyClaim(c.quoteRaw, src);
+    });
+    state.results = results;
+    renderResults();
+    await buildReceipt();
+    renderReceiptPanel();
+    await appendLedger();
+    renderLedger();
+    runStatus.textContent = 'Done — ' + new Date().toLocaleTimeString();
+  } catch(e){
+    runStatus.textContent = 'Error: ' + e.message;
+  } finally {
+    updateRunButton();
+  }
+});
+
+$('demoBtn').addEventListener('click', async function(){
+  state.sources = []; state.claims = []; state.results = null; state.receipt = null;
+  var demoText = "Every system we ship must explain itself in the same breath it acts. " +
+    "We are not asking users to trust the machine; we are asking the machine to show its work " +
+    "every single time, without exception, because a claim nobody can check is not a fact, it is " +
+    "a hope. The team spent the spring building three small tools before one large one, because " +
+    "small tools fail small and large tools fail large. None of this replaces judgment. It only " +
+    "makes judgment auditable.";
+  var norm = normalize(demoText);
+  var hash = await sha256Hex(norm);
+  state.sources.push({ id: uid(), label: 'Fictional Keynote Transcript', norm: norm, hash: hash, length: norm.length });
+  state.claims.push({ id: uid(), sourceLabel: 'Fictional Keynote Transcript', locator: '00:41 (exact)',
+    quoteRaw: 'we are asking the machine to show its work every single time, without exception' });
+  state.claims.push({ id: uid(), sourceLabel: 'Fictional Keynote Transcript', locator: '00:41 (one word changed)',
+    quoteRaw: 'we are asking the machine to show its work every single day, without exception' });
+  state.claims.push({ id: uid(), sourceLabel: 'Fictional Keynote Transcript', locator: 'claimed 01:10 (fabricated)',
+    quoteRaw: 'The company guarantees zero downtime for every customer forever.' });
+  renderSources(); renderClaimSourceOptions(); renderClaims(); updateRunButton();
+  $('resultsPanel').classList.add('hidden');
+  $('receiptPanel').classList.add('hidden');
+  runStatus.textContent = 'Demo loaded — click "Run verification".';
+});
+
+$('clearAllBtn').addEventListener('click', function(){
+  if (!window.confirm('Clear all sources, claims, results and the session ledger?')) return;
+  state.sources = []; state.claims = []; state.results = null; state.receipt = null; state.ledger = [];
+  renderSources(); renderClaimSourceOptions(); renderClaims(); updateRunButton();
+  $('resultsPanel').classList.add('hidden');
+  $('receiptPanel').classList.add('hidden');
+  $('ledgerPanel').classList.add('hidden');
+  $('ledgerImportResult').textContent = '';
+  runStatus.textContent = '';
+});
+
+$('toggleJsonBtn').addEventListener('click', function(){
+  var el = $('receiptJson');
+  el.classList.toggle('hidden');
+  $('toggleJsonBtn').textContent = el.classList.contains('hidden') ? 'Show canonical JSON' : 'Hide canonical JSON';
+});
+
+$('copyHashBtn').addEventListener('click', async function(){
+  var text = $('receiptHash').textContent;
+  var flag = $('copiedFlag');
+  try{
+    await navigator.clipboard.writeText(text);
+    flag.classList.add('show');
+    setTimeout(function(){ flag.classList.remove('show'); }, 1200);
+  } catch(e){ /* clipboard blocked — hash is visible/selectable in the box regardless */ }
+});
+
+$('hashComputeBtn').addEventListener('click', async function(){
+  var out = $('hashOutput');
+  var text = $('hashInput').value;
+  if (!text){ out.textContent = '—'; return; }
+  try{
+    out.textContent = await sha256Hex(text);
+  } catch(e){
+    out.textContent = 'Error: ' + e.message;
+  }
+});
+
+$('exportLedgerBtn').addEventListener('click', function(){
+  if (state.ledger.length === 0) return;
+  var doc = {
+    algorithm: ALGO_VERSION,
+    entries: state.ledger.map(function(e){
+      return { n: e.n, ts: e.ts, summary: e.summary, receiptHash: e.receiptHash,
+        prevChainHash: e.prevChainHash, chainHash: e.chainHash };
+    })
+  };
+  var blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'citelock-ledger.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+});
+
+$('importLedgerInput').addEventListener('change', async function(ev){
+  var file = ev.target.files && ev.target.files[0];
+  var resultEl = $('ledgerImportResult');
+  if (!file) return;
+  resultEl.textContent = 'Checking…';
+  try{
+    var text = await file.text();
+    var doc = JSON.parse(text);
+    var entries = doc.entries || [];
+    var lines = [];
+    var ok = true;
+    var expectedPrev = ZERO_HASH;
+    for (var i=0;i<entries.length;i++){
+      var e = entries[i];
+      var prevMatches = (e.prevChainHash === expectedPrev);
+      var recomputed = await sha256Hex(e.prevChainHash + ':' + e.receiptHash + ':' + e.summary);
+      var chainMatches = (recomputed === e.chainHash);
+      var entryOk = prevMatches && chainMatches;
+      if (!entryOk) ok = false;
+      lines.push('#' + e.n + ': ' + (entryOk ? 'OK' : 'MISMATCH' +
+        (!prevMatches ? ' (broken link to previous entry)' : '') +
+        (!chainMatches ? ' (chain hash does not recompute — entry was edited)' : '')));
+      expectedPrev = e.chainHash;
+    }
+    resultEl.innerHTML = '<strong style="color:' + (ok ? 'var(--good)' : 'var(--bad)') + '">' +
+      (ok ? 'Chain valid — ' : 'Chain BROKEN — ') + entries.length + ' entrie(s) checked.</strong><br>' +
+      lines.map(escapeHtml).join('<br>');
+  } catch(e){
+    resultEl.textContent = 'Could not read/verify this file: ' + e.message;
+  }
+  ev.target.value = '';
+});
+
+/* ---------- init ---------- */
+if (!hasSubtle()){
+  var warn = document.createElement('div');
+  warn.className = 'panel';
+  warn.style.borderColor = 'var(--bad)';
+  warn.innerHTML = '<strong style="color:var(--bad);">Web Crypto unavailable.</strong> ' +
+    'This browser context has no <code>crypto.subtle</code>, so hashing (and therefore the ' +
+    'receipt and ledger) will not work. This page needs to be served over HTTPS (or localhost) ' +
+    '— matching and verdicts above will still run, but no hash can be produced.';
+  document.querySelector('.wrap').insertBefore(warn, document.querySelector('.intro').nextSibling);
+}
+renderSources();
+renderClaimSourceOptions();
+renderClaims();
+updateRunButton();
+</script>
+</body>
+</html>
