@@ -14,8 +14,12 @@ import { createHash } from 'node:crypto';
 
 const NAME = JSON.parse(readFileSync('package.json', 'utf8')).name;
 const RECEIPT = 'receipts/witness.json';
-const WITNESS_V06_SHA256 = 'eb0ed198306b596e58d62cab030cb839bd20402f53f78d5e52f345e963bebf64';   // witness.mjs @ v0.6
+// witness.mjs at the v0.6 tag, as committed: `git show v0.6:witness.mjs | sha256sum`
+const WITNESS_V06_SHA256 = '9918297aa5f8fc4e1d26d9e6b25226f56102fdc04f0c634155bfcba1c086ef48';
 const sha = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
+// A Windows checkout with core.autocrlf turns LF into CRLF; hash the instrument with LF line endings so the
+// same commit gives the same hash on every machine.
+const shaLF = (path) => createHash('sha256').update(readFileSync(path, 'utf8').replace(/\r\n/g, '\n')).digest('hex');
 const CAP = 100000;   // no practical cap: a capped run would not be the whole file
 const TIMEOUT_MS = 60000;   // per mutant; generous so a slow machine never turns a finished run into a timeout 'kill'
 
@@ -33,6 +37,13 @@ function verify() {
 }
 
 function gate(witnessPath) {
+  // Hash the instrument BEFORE it runs, and refuse anything that is not v0.6: a receipt must name the
+  // exact witness that judged the kernel, and a checkout that moved mid-run would make it lie.
+  const witnessSha = shaLF(witnessPath);
+  if (witnessSha !== WITNESS_V06_SHA256) {
+    console.error(`✗ ${witnessPath} is not witness v0.6 (sha256 ${witnessSha.slice(0, 12)}…); check out the v0.6 tag first`);
+    process.exit(2);
+  }
   const t0 = Date.now();
   const run = spawnSync(process.execPath, [witnessPath, 'mutate', 'kernel.mjs', '--cap', String(CAP), '--timeout', String(TIMEOUT_MS), '--test', process.execPath, '--test', 'kernel.test.mjs'],
     { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -43,7 +54,7 @@ function gate(witnessPath) {
   const receipt = {
     kind: `${NAME}.witness`,
     v: 1,
-    witness: { tag: 'v0.6', commit: 'f04fe3047e3d49b98c67713befd5b77182afa0d4', sha256: sha(witnessPath) },
+    witness: { tag: 'v0.6', commit: 'f04fe3047e3d49b98c67713befd5b77182afa0d4', sha256: witnessSha },
     kernel: 'kernel.mjs',
     kernelSha256: sha('kernel.mjs'),
     tests: 'node --test kernel.test.mjs',

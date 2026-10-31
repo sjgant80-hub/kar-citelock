@@ -20,10 +20,32 @@ export function extractKernel(html) {
 }
 
 // Every top-level declaration in the block is exported, so nothing in the page is untestable.
+// `var a = 1, b = [2, 3], c = f(4, 5);` declares a, b and c: split at commas outside brackets and strings.
+function declaredNames(rest) {
+  const names = [];
+  let depth = 0, quote = null, part = '';
+  for (const ch of rest + ',') {
+    if (quote) { if (ch === quote) quote = null; part += ch; continue; }
+    if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+    else if ('([{'.includes(ch)) depth++;
+    else if (')]}'.includes(ch)) depth--;
+    else if (ch === ';' && depth === 0) break;
+    if (ch === ',' && depth === 0) {
+      const m = part.match(/^\s*([A-Za-z_$][\w$]*)/);
+      if (m) names.push(m[1]);
+      part = '';
+    } else part += ch;
+  }
+  const m = part.match(/^\s*([A-Za-z_$][\w$]*)/);
+  if (m) names.push(m[1]);
+  return names;
+}
+
 export function topLevelNames(code) {
   const names = [];
-  for (const m of code.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)|^(?:var|let|const)\s+([A-Za-z_$][\w$]*)/gm)) {
-    names.push(m[1] || m[2]);
+  for (const m of code.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)|^(?:var|let|const)\s+(.*)$/gm)) {
+    if (m[1]) names.push(m[1]);
+    else names.push(...declaredNames(m[2]));
   }
   return [...new Set(names)];
 }
