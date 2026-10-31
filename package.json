@@ -1,0 +1,16 @@
+{
+  "name": "kar-citelock",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Deterministic quote and citation verifier, no LLM judge: is each claimed quote really in its source?",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test kernel.test.mjs skill.test.mjs",
+    "zip": "node make-zip.mjs",
+    "gate": "node gate.mjs --witness ../witness/witness.mjs",
+    "verify-receipt": "node gate.mjs --verify"
+  }
+}

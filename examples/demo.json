@@ -1,0 +1,13 @@
+{
+  "sources": [
+    {
+      "label": "Fictional Keynote Transcript",
+      "text": "Every system we ship must explain itself in the same breath it acts. We are not asking users to trust the machine; we are asking the machine to show its work every single time, without exception, because a claim nobody can check is not a fact, it is a hope. The team spent the spring building three small tools before one large one, because small tools fail small and large tools fail large. None of this replaces judgment. It only makes judgment auditable."
+    }
+  ],
+  "claims": [
+    { "source": "Fictional Keynote Transcript", "locator": "00:41 (exact)", "quote": "we are asking the machine to show its work every single time, without exception" },
+    { "source": "Fictional Keynote Transcript", "locator": "00:41 (one word changed)", "quote": "we are asking the machine to show its work every single day, without exception" },
+    { "source": "Fictional Keynote Transcript", "locator": "claimed 01:10 (fabricated)", "quote": "The company guarantees zero downtime for every customer forever." }
+  ]
+}

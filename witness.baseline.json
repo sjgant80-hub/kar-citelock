@@ -1,0 +1,14 @@
+[
+  {
+    "line": 158,
+    "mutation": "> → >=",
+    "snippet": "var sortedSources = sources.slice().sort(function(a,b){ return a.label < b.label ? -1 : a.",
+    "reason": "Equivalent, and checked rather than argued. This mutant only changes what the sort comparator returns for two EQUAL keys (1 instead of 0). V8's Array.prototype.sort (TimSort) only ever branches on order < 0, so 1 and 0 lead to the same placement and the same final order. Verified by differential run: arrays of 2, 3, 10, 33, 70, 200 and 1000 all-equal keys, and 300 mixed keys, sorted with both comparators: identical order every time. The < to <= mutant on the same line is NOT equivalent and is killed by the stable-ties test."
+  },
+  {
+    "line": 171,
+    "mutation": "> → >=",
+    "snippet": "return ka < kb ? -1 : ka > kb ? 1 : 0;",
+    "reason": "Equivalent, and checked rather than argued. This mutant only changes what the sort comparator returns for two EQUAL keys (1 instead of 0). V8's Array.prototype.sort (TimSort) only ever branches on order < 0, so 1 and 0 lead to the same placement and the same final order. Verified by differential run: arrays of 2, 3, 10, 33, 70, 200 and 1000 all-equal keys, and 300 mixed keys, sorted with both comparators: identical order every time. The < to <= mutant on the same line is NOT equivalent and is killed by the stable-ties test."
+  }
+]

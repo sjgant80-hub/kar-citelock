@@ -246,8 +246,10 @@
 
   <footer>
     CiteLock · kar-citelock · a FallForge estate build. Single static file, no network calls, no
-    accounts, no pricing. Verifies quote-to-source grounding only — it is one deterministic check
-    among many you should run, not a full fact-check.
+    accounts. Verifies quote-to-source grounding only — it is one deterministic check
+    among many you should run, not a full fact-check.<br>
+    Agents can run the same check: <a href="https://github.com/sjgant80-hub/kar-citelock">source, agent skill and mutation receipt</a>.
+    Powered by the Konomi architecture, created by Thomas Frumkin.
   </footer>
 
 </div>
@@ -255,21 +257,11 @@
 <script>
 'use strict';
 
+/* ==== KERNEL:BEGIN — the verifier itself; build.mjs copies this block byte-for-byte into kernel.mjs (tested, mutation-gated) and the Agensi skill script ==== */
 /* ---------- constants ---------- */
 var ALGO_VERSION = 'citelock-v1';
 var NEAR_THRESHOLD = 0.90;
 var ZERO_HASH = '0'.repeat(64);
-
-/* ---------- state ---------- */
-var state = {
-  sources: [],   // {id, label, norm, hash, length}
-  claims: [],    // {id, sourceLabel, quoteRaw, locator}
-  results: null, // parallel to claims: {verdict, similarity, excerpt}
-  receipt: null, // {payload, json, hash}
-  ledger: []     // {n, ts, summary, receiptHash, prevChainHash, chainHash}
-};
-var uidCounter = 0;
-function uid(){ uidCounter += 1; return 'id' + uidCounter + '_' + Math.random().toString(36).slice(2,8); }
 
 /* ---------- text normalization ---------- */
 function normalize(s){
@@ -288,12 +280,12 @@ function normalize(s){
 
 /* ---------- hashing ---------- */
 function hasSubtle(){
-  return !!(window.crypto && window.crypto.subtle && window.crypto.subtle.digest);
+  return !!(globalThis.crypto && globalThis.crypto.subtle && globalThis.crypto.subtle.digest);
 }
 async function sha256Hex(str){
   if (!hasSubtle()) throw new Error('Web Crypto (crypto.subtle) is not available in this context.');
   var enc = new TextEncoder().encode(str);
-  var buf = await window.crypto.subtle.digest('SHA-256', enc);
+  var buf = await globalThis.crypto.subtle.digest('SHA-256', enc);
   var bytes = new Uint8Array(buf);
   var hex = '';
   for (var i=0;i<bytes.length;i++){ hex += bytes[i].toString(16).padStart(2,'0'); }
@@ -370,6 +362,7 @@ function contextSnippet(norm, idx, len, pad){
 function verifyClaim(quoteRaw, src){
   var quote = normalize(quoteRaw);
   if (!quote) return { verdict:'EMPTY', similarity:0, excerpt:'' };
+  if (!src || typeof src.norm !== 'string') return { verdict:'SOURCE_MISSING', similarity:0, excerpt:'' };
 
   var idx = src.norm.indexOf(quote);
   if (idx !== -1){
@@ -400,6 +393,80 @@ function verifyClaim(quoteRaw, src){
     excerpt: contextSnippet(src.norm, best.idx, quote.length)
   };
 }
+
+/* ---------- sources, runs, receipts, ledger (shared by the page and the skill script) ---------- */
+async function makeSource(label, text){
+  var norm = normalize(text);
+  return { label: label, norm: norm, hash: await sha256Hex(norm), length: norm.length };
+}
+
+function verifyAll(sources, claims){
+  return claims.map(function(c){
+    var src = sources.find(function(s){ return s.label === c.sourceLabel; });
+    if (!src) return { verdict:'SOURCE_MISSING', similarity:0, excerpt:'' };
+    return verifyClaim(c.quoteRaw, src);
+  });
+}
+
+function summarizeVerdicts(results){
+  var counts = {};
+  results.forEach(function(r){ counts[r.verdict] = (counts[r.verdict]||0)+1; });
+  return Object.keys(counts).sort().map(function(k){ return k + ':' + counts[k]; }).join('|');
+}
+
+function receiptPayload(sources, claims, results){
+  var sortedSources = sources.slice().sort(function(a,b){ return a.label < b.label ? -1 : a.label > b.label ? 1 : 0; });
+  var claimRows = claims.map(function(c, i){
+    var r = results[i];
+    return {
+      source: c.sourceLabel,
+      quote: normalize(c.quoteRaw),
+      locator: c.locator || '',
+      verdict: r.verdict,
+      similarity: (typeof r.similarity === 'number' ? r.similarity : 0).toFixed(4)
+    };
+  }).sort(function(a,b){
+    var ka = a.source + '\u0000' + a.quote + '\u0000' + a.locator;
+    var kb = b.source + '\u0000' + b.quote + '\u0000' + b.locator;
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
+  return {
+    algorithm: ALGO_VERSION,
+    nearThreshold: NEAR_THRESHOLD.toFixed(2),
+    sources: sortedSources.map(function(s){ return { label: s.label, sha256: s.hash, length: s.length }; }),
+    claims: claimRows
+  };
+}
+
+function chainHash(prevChainHash, receiptHash, summary){
+  return sha256Hex(prevChainHash + ':' + receiptHash + ':' + summary);
+}
+
+async function verifyLedger(entries){
+  var list = Array.isArray(entries) ? entries : [];
+  var checks = [];
+  var expectedPrev = ZERO_HASH;
+  for (var i=0;i<list.length;i++){
+    var e = list[i] || {};
+    var prevMatches = (e.prevChainHash === expectedPrev);
+    var chainMatches = ((await chainHash(e.prevChainHash, e.receiptHash, e.summary)) === e.chainHash);
+    checks.push({ n: e.n, ok: prevMatches && chainMatches, prevMatches: prevMatches, chainMatches: chainMatches });
+    expectedPrev = e.chainHash;
+  }
+  return { ok: Array.isArray(entries) && checks.every(function(c){ return c.ok; }), checks: checks };
+}
+/* ==== KERNEL:END ==== */
+
+/* ---------- state ---------- */
+var state = {
+  sources: [],   // {id, label, norm, hash, length}
+  claims: [],    // {id, sourceLabel, quoteRaw, locator}
+  results: null, // parallel to claims: {verdict, similarity, excerpt}
+  receipt: null, // {payload, json, hash}
+  ledger: []     // {n, ts, summary, receiptHash, prevChainHash, chainHash}
+};
+var uidCounter = 0;
+function uid(){ uidCounter += 1; return 'id' + uidCounter + '_' + Math.random().toString(36).slice(2,8); }
 
 /* ---------- DOM refs ---------- */
 var $ = function(id){ return document.getElementById(id); };
@@ -507,9 +574,7 @@ function renderReceiptPanel(){
 }
 
 function summarizeResults(){
-  var counts = {};
-  state.results.forEach(function(r){ counts[r.verdict] = (counts[r.verdict]||0)+1; });
-  return Object.keys(counts).sort().map(function(k){ return k + ':' + counts[k]; }).join('|');
+  return summarizeVerdicts(state.results);
 }
 
 function renderLedger(){
@@ -528,27 +593,7 @@ function renderLedger(){
 
 /* ---------- receipt + ledger building ---------- */
 async function buildReceipt(){
-  var sortedSources = state.sources.slice().sort(function(a,b){ return a.label < b.label ? -1 : a.label > b.label ? 1 : 0; });
-  var claimRows = state.claims.map(function(c, i){
-    var r = state.results[i];
-    return {
-      source: c.sourceLabel,
-      quote: normalize(c.quoteRaw),
-      locator: c.locator || '',
-      verdict: r.verdict,
-      similarity: (typeof r.similarity === 'number' ? r.similarity : 0).toFixed(4)
-    };
-  }).sort(function(a,b){
-    var ka = a.source + '\u0000' + a.quote + '\u0000' + a.locator;
-    var kb = b.source + '\u0000' + b.quote + '\u0000' + b.locator;
-    return ka < kb ? -1 : ka > kb ? 1 : 0;
-  });
-  var payload = {
-    algorithm: ALGO_VERSION,
-    nearThreshold: NEAR_THRESHOLD.toFixed(2),
-    sources: sortedSources.map(function(s){ return { label: s.label, sha256: s.hash, length: s.length }; }),
-    claims: claimRows
-  };
+  var payload = receiptPayload(state.sources, state.claims, state.results);
   var json = canonicalJSON(payload);
   var hash = await sha256Hex(json);
   state.receipt = { payload: payload, json: json, hash: hash };
@@ -557,15 +602,14 @@ async function buildReceipt(){
 async function appendLedger(){
   var prevChainHash = state.ledger.length ? state.ledger[state.ledger.length-1].chainHash : ZERO_HASH;
   var summary = summarizeResults();
-  var chainInput = prevChainHash + ':' + state.receipt.hash + ':' + summary;
-  var chainHash = await sha256Hex(chainInput);
+  var linkHash = await chainHash(prevChainHash, state.receipt.hash, summary);
   state.ledger.push({
     n: state.ledger.length + 1,
     ts: new Date().toISOString(),
     summary: summary,
     receiptHash: state.receipt.hash,
     prevChainHash: prevChainHash,
-    chainHash: chainHash
+    chainHash: linkHash
   });
 }
 
@@ -577,12 +621,12 @@ sourceForm.addEventListener('submit', async function(ev){
   var text = srcText.value;
   if (!label){ srcErr.textContent = 'Give this source a label.'; return; }
   if (state.sources.some(function(s){ return s.label === label; })){ srcErr.textContent = 'That label is already used — pick a unique one.'; return; }
-  var norm = normalize(text);
-  if (!norm){ srcErr.textContent = 'Paste the source text.'; return; }
-  var hash;
-  try { hash = await sha256Hex(norm); }
+  if (!normalize(text)){ srcErr.textContent = 'Paste the source text.'; return; }
+  var src;
+  try { src = await makeSource(label, text); }
   catch(e){ srcErr.textContent = 'Could not hash this source: ' + e.message; return; }
-  state.sources.push({ id: uid(), label: label, norm: norm, hash: hash, length: norm.length });
+  src.id = uid();
+  state.sources.push(src);
   srcLabel.value = ''; srcText.value = '';
   renderSources(); renderClaimSourceOptions(); updateRunButton();
 });
@@ -620,12 +664,7 @@ runBtn.addEventListener('click', async function(){
   runBtn.disabled = true;
   runStatus.textContent = 'Running…';
   try{
-    var results = state.claims.map(function(c){
-      var src = state.sources.find(function(s){ return s.label === c.sourceLabel; });
-      if (!src) return { verdict:'SOURCE_MISSING', similarity:0, excerpt:'' };
-      return verifyClaim(c.quoteRaw, src);
-    });
-    state.results = results;
+    state.results = verifyAll(state.sources, state.claims);
     renderResults();
     await buildReceipt();
     renderReceiptPanel();
@@ -647,9 +686,9 @@ $('demoBtn').addEventListener('click', async function(){
     "a hope. The team spent the spring building three small tools before one large one, because " +
     "small tools fail small and large tools fail large. None of this replaces judgment. It only " +
     "makes judgment auditable.";
-  var norm = normalize(demoText);
-  var hash = await sha256Hex(norm);
-  state.sources.push({ id: uid(), label: 'Fictional Keynote Transcript', norm: norm, hash: hash, length: norm.length });
+  var demoSource = await makeSource('Fictional Keynote Transcript', demoText);
+  demoSource.id = uid();
+  state.sources.push(demoSource);
   state.claims.push({ id: uid(), sourceLabel: 'Fictional Keynote Transcript', locator: '00:41 (exact)',
     quoteRaw: 'we are asking the machine to show its work every single time, without exception' });
   state.claims.push({ id: uid(), sourceLabel: 'Fictional Keynote Transcript', locator: '00:41 (one word changed)',
@@ -726,21 +765,13 @@ $('importLedgerInput').addEventListener('change', async function(ev){
     var text = await file.text();
     var doc = JSON.parse(text);
     var entries = doc.entries || [];
-    var lines = [];
-    var ok = true;
-    var expectedPrev = ZERO_HASH;
-    for (var i=0;i<entries.length;i++){
-      var e = entries[i];
-      var prevMatches = (e.prevChainHash === expectedPrev);
-      var recomputed = await sha256Hex(e.prevChainHash + ':' + e.receiptHash + ':' + e.summary);
-      var chainMatches = (recomputed === e.chainHash);
-      var entryOk = prevMatches && chainMatches;
-      if (!entryOk) ok = false;
-      lines.push('#' + e.n + ': ' + (entryOk ? 'OK' : 'MISMATCH' +
-        (!prevMatches ? ' (broken link to previous entry)' : '') +
-        (!chainMatches ? ' (chain hash does not recompute — entry was edited)' : '')));
-      expectedPrev = e.chainHash;
-    }
+    var verdict = await verifyLedger(entries);
+    var ok = verdict.ok;
+    var lines = verdict.checks.map(function(c){
+      return '#' + c.n + ': ' + (c.ok ? 'OK' : 'MISMATCH' +
+        (!c.prevMatches ? ' (broken link to previous entry)' : '') +
+        (!c.chainMatches ? ' (chain hash does not recompute — entry was edited)' : ''));
+    });
     resultEl.innerHTML = '<strong style="color:' + (ok ? 'var(--good)' : 'var(--bad)') + '">' +
       (ok ? 'Chain valid — ' : 'Chain BROKEN — ') + entries.length + ' entrie(s) checked.</strong><br>' +
       lines.map(escapeHtml).join('<br>');
