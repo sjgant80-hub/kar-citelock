@@ -12,12 +12,13 @@ docs_url: "https://sjgant80-hub.github.io/kar-citelock/"
 
 CiteLock answers one question with no model in the loop: **is this quote really in that source?** It
 normalises both texts (Unicode NFKC, curly quotes, dashes, non-breaking spaces, runs of whitespace) and
-looks for the quote verbatim. If it is not there verbatim, it anchors on the longest phrase of 3 to 8
+looks for the quote verbatim, as whole words: it must not start or end in the middle of a word, so "he said
+yes" is not verified by "she said yes" (version 1 did verify it). If it is not there verbatim, it anchors on the longest phrase of 3 to 8
 words the quote shares with the source and scores the closest passage by Levenshtein similarity.
 
 | Verdict | Meaning |
 |---|---|
-| `VERIFIED` | The quote is in the source, verbatim after normalisation. |
+| `VERIFIED` | The quote is in the source, verbatim after normalisation, as whole words. |
 | `NEAR_MATCH` | Not verbatim, but a passage of the source is at least 90% similar: a changed word, a typo, a dropped comma. |
 | `NOT_FOUND` | No passage of the source is 90% similar. Treat the quote as unsupported. |
 | `SOURCE_MISSING` | The claim names a source label that was not supplied. |
@@ -75,7 +76,7 @@ one invented. The report (`examples/demo.out.json`, exit code 1) reads, in part:
       "excerpt": "…show its work every single time, without exception, because a claim nobody can …" },
     { "locator": "claimed 01:10 (fabricated)", "verdict": "NOT_FOUND", "similarity": 0 }
   ],
-  "receipt": { "sha256": "dd2417527e3146f8c3ff428fc97a439d981cb7eaea1d32907a97a28a91e0d091", "canonical": "{…}" }
+  "receipt": { "sha256": "45ceeaf5e92d8b662ae70a43b3f8969c5ab4d5c0274af2bd47dda5f8d0ecdcdf", "canonical": "{…}" }
 }
 ```
 
@@ -90,7 +91,7 @@ machine, and no language model judges anything.
 - **A receipt:** `receipt.canonical` is the canonical JSON of the result (keys sorted, no whitespace) and
   `receipt.sha256` is its SHA-256. Hash the canonical string with any SHA-256 tool and compare.
 - **The example:** `node scripts/kar-citelock.mjs examples/demo.json` prints exactly the report in
-  `examples/demo.out.json` and exits 1, receipt `dd2417527e31…`.
+  `examples/demo.out.json` and exits 1, receipt `45ceeaf5e92d…`.
 - **The page:** the live page at https://sjgant80-hub.github.io/kar-citelock/ runs the same logic in a
   browser. Its "Load demo" then "Run verification" shows the same receipt hash.
 - **The source:** https://github.com/sjgant80-hub/kar-citelock (MIT). The script's KERNEL block is
@@ -99,8 +100,8 @@ machine, and no language model judges anything.
   tests, the byte-identity check, the receipt check, the witness mutation gate and the ZIP build, and prints
   the ZIP's SHA-256.
 - **The mutation gate:** witness v0.6 (https://github.com/sjgant80-hub/witness, tag `v0.6`) made
-  38 single-operator changes (mutants) to the kernel and the tests caught 36 of them. The other 2 are equivalent mutants: they cannot change behaviour, and each has its measured reason in `witness.baseline.json`. The receipt is
-  `receipts/witness.json` in the repository, for kernel SHA-256 `d1534bc802f6a242ea8acdab3cdfc9cb41fef525b90a61c4aeb9354d9002ae39`. With the repository and
+  53 single-operator changes (mutants) to the kernel and the tests caught 51 of them. The other 2 are equivalent mutants: they cannot change behaviour, and each has its measured reason in `witness.baseline.json`. The receipt is
+  `receipts/witness.json` in the repository, for kernel SHA-256 `74f090443842ff5d279769920880f3106358b99590b1090348a3c4c15cdca77e`. With the repository and
   witness v0.6 side by side, `node gate.mjs --witness ../witness/witness.mjs` re-runs it.
 
 ## Where it stops
@@ -111,6 +112,8 @@ machine, and no language model judges anything.
   word in a quote of a few words can fall below it and read `NOT_FOUND`.
 - A quote must share a run of at least three words with the source to be scored at all; shorter quotes are
   `VERIFIED` only when they appear verbatim.
+- In scripts written without spaces between words (Chinese, Japanese, Thai, Lao, Khmer, Myanmar) there are no
+  word edges, so a quote in them is verified wherever its exact text appears.
 
 ---
 

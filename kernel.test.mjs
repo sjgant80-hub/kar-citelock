@@ -6,11 +6,11 @@ import assert from 'node:assert/strict';
 import {
   ALGO_VERSION, NEAR_THRESHOLD, ZERO_HASH, normalize, hasSubtle, sha256Hex, canonicalize, canonicalJSON,
   levenshtein, similarity, findAnchor, contextSnippet, verifyClaim, makeSource, verifyAll, summarizeVerdicts,
-  receiptPayload, chainHash, verifyLedger,
+  receiptPayload, chainHash, verifyLedger, isWordChar, findWhole, NO_SPACE_SCRIPTS,
 } from './kernel.mjs';
 
 test('constants are the published algorithm', () => {
-  assert.equal(ALGO_VERSION, 'citelock-v1');
+  assert.equal(ALGO_VERSION, 'citelock-v2');
   assert.equal(NEAR_THRESHOLD, 0.9);
   assert.equal(ZERO_HASH, '0'.repeat(64));
 });
@@ -104,6 +104,57 @@ test('verifyClaim: exact (after normalisation) → VERIFIED with similarity 1', 
   assert.equal(r.excerpt, 'He said: "ship it today", then left.');
 });
 
+test('isWordChar: one letter or digit of a script written with spaces; nothing else', () => {
+  for (const c of ['a', 'Z', '5', '\u00E9', '\u0430', '\u03B1', '\u05E9', '\u0645', '\uAC00']) assert.equal(isWordChar(c), true, c);
+  for (const c of ['', ' ', '-', "'", '"', '.', ',', 'ab', '\u4E2D', '\u3042', '\u30A2', '\u0E01', '\u0E81', '\u1780', '\u1000', undefined, null, 5])
+    assert.equal(isWordChar(c), false, String(c));
+  assert.equal(NO_SPACE_SCRIPTS.test('\u4E2D'), true);
+  assert.equal(NO_SPACE_SCRIPTS.test('a'), false);
+});
+
+test('findWhole: the first occurrence that starts and ends on a word edge', () => {
+  assert.equal(findWhole('she said yes', 'he said yes'), -1);
+  assert.equal(findWhole('police', 'lice'), -1);
+  assert.equal(findWhole('lice police', 'lice'), 0);                         // at the very start
+  assert.equal(findWhole('the police lice', 'lice'), 11);                    // at the very end
+  assert.equal(findWhole('she said yes, then he said yes.', 'he said yes'), 19);   // skips the one inside "she"
+  assert.equal(findWhole('he said yesterday', 'he said yes'), -1);           // ends inside a word
+  assert.equal(findWhole('he said yes!', 'he said yes'), 0);                 // punctuation is an edge
+  assert.equal(findWhole('x"not accurate"y', '"not accurate"'), 1);         // a quote that starts and ends with punctuation
+  assert.equal(findWhole('ab-cd', '-cd'), 2);                                // starts with punctuation: the left side needs no edge
+  assert.equal(findWhole('abc-', 'c-'), -1);                                 // ...but its right side still does when it ends on a letter
+  assert.equal(findWhole('abc-', 'bc-'), -1);
+  assert.equal(findWhole('a bc-', 'bc-'), 2);
+  assert.equal(findWhole('\u6211\u4EEC\u4ECA\u5929\u5F00\u4F1A', '\u4ECA\u5929'), 2);   // Chinese: no word edges, any substring
+  assert.equal(findWhole('abc', 'zz'), -1);
+});
+
+test('verifyClaim: a quote found only inside longer words is not VERIFIED (v1 verified "he said yes" in "she said yes")', async () => {
+  const src = await makeSource('s', 'Asked about the merger, she said yes. Then he left.');
+  // measured against the whole words it sits in: 1 - 1/12, and the excerpt shows what the source says
+  assert.deepEqual(verifyClaim('he said yes', src),
+    { verdict: 'NEAR_MATCH', similarity: 1 - 1 / 12, excerpt: 'Asked about the merger, she said yes. Then he left.' });
+  assert.equal(verifyClaim('lice', await makeSource('p', 'The police said so.')).verdict, 'NOT_FOUND');
+  // the excerpt runs to the word edges on both sides, padded as usual
+  const long = await makeSource('l', 'x'.repeat(40) + ' then the boss and she said yesterday it was fine ' + 'y'.repeat(40));
+  const r = verifyClaim('he said yes', long);
+  assert.equal(r.verdict, 'NOT_FOUND');
+  assert.equal(r.similarity, 1 - 7 / 18);                                    // "he said yes" against "she said yesterday": 7 edits, 18 characters
+  // 30 characters of padding each side of the whole words: 11 x + ' then the boss and ' (19) before, ' it was fine ' (13) + 17 y after
+  assert.equal(r.excerpt, '…' + 'x'.repeat(11) + ' then the boss and she said yesterday it was fine ' + 'y'.repeat(17) + '…');
+  // whole words still VERIFY, wherever they are
+  assert.equal(verifyClaim('she said yes', src).verdict, 'VERIFIED');
+  assert.equal(verifyClaim('he left', src).verdict, 'VERIFIED');
+  assert.equal(verifyClaim('Asked about', src).verdict, 'VERIFIED');
+});
+
+test('verifyClaim: an ordinary near miss scores exactly as in v1 (only the exact-text case is re-measured)', async () => {
+  const src = await makeSource('s', 'Minutes: The committee agreed the pilot would move to the new platform firstly and soon.');
+  // measured with citelock-v1 on the same input: the window ends inside "firstly" and is not widened
+  assert.deepEqual(verifyClaim('the committee agreed the pilot would shift to the new platform first', src),
+    { verdict: 'NOT_FOUND', similarity: 0.8970588235294118, excerpt: 'Minutes: The committee agreed the pilot would move to the new platform firstly and soon.' });
+});
+
 test('verifyClaim never throws: no source, or a source without text, is SOURCE_MISSING', () => {
   const missing = { verdict: 'SOURCE_MISSING', similarity: 0, excerpt: '' };
   assert.deepEqual(verifyClaim('a quote', undefined), missing);
@@ -174,7 +225,7 @@ test('receiptPayload: sources sorted by label, claims sorted by source/quote/loc
   ];
   const results = [{ verdict: 'NEAR_MATCH', similarity: 0.93587 }, { verdict: 'EMPTY' }];
   assert.deepEqual(receiptPayload(sources, claims, results), {
-    algorithm: 'citelock-v1',
+    algorithm: 'citelock-v2',
     nearThreshold: '0.90',
     sources: [{ label: 'A', sha256: 'ha', length: 1 }, { label: 'B', sha256: 'hb', length: 2 }],
     claims: [

@@ -7,23 +7,23 @@
   "sha256": "9918297aa5f8fc4e1d26d9e6b25226f56102fdc04f0c634155bfcba1c086ef48"
  },
  "kernel": "kernel.mjs",
- "kernelSha256": "d1534bc802f6a242ea8acdab3cdfc9cb41fef525b90a61c4aeb9354d9002ae39",
+ "kernelSha256": "74f090443842ff5d279769920880f3106358b99590b1090348a3c4c15cdca77e",
  "tests": "node --test kernel.test.mjs",
- "testsSha256": "5b346f34753721825084e2dfedd4164caceba836641806b7bfbaa45c899da43d",
+ "testsSha256": "5c067493696a41bfb6fe359da65da3f1d862279d9809bcad491fdaf812ef66d9",
  "node": "v25.7.0",
  "platform": "win32",
- "total": 38,
- "killed": 36,
+ "total": 53,
+ "killed": 51,
  "survived": [],
  "ignored": [
   {
-   "line": 159,
+   "line": 191,
    "mutation": "> → >=",
    "snippet": "var sortedSources = sources.slice().sort(function(a,b){ return a.label < b.label ? -1 : a.",
    "reason": "Equivalent, and checked rather than argued. This mutant only changes what the sort comparator returns for two EQUAL keys (1 instead of 0). V8's Array.prototype.sort (TimSort) only ever branches on order < 0, so 1 and 0 lead to the same placement and the same final order. Verified by differential run: arrays of 2, 3, 10, 33, 70, 200 and 1000 all-equal keys, and 300 mixed keys, sorted with both comparators: identical order every time. The < to <= mutant on the same line is NOT equivalent and is killed by the stable-ties test."
   },
   {
-   "line": 172,
+   "line": 204,
    "mutation": "> → >=",
    "snippet": "return ka < kb ? -1 : ka > kb ? 1 : 0;",
    "reason": "Equivalent, and checked rather than argued. This mutant only changes what the sort comparator returns for two EQUAL keys (1 instead of 0). V8's Array.prototype.sort (TimSort) only ever branches on order < 0, so 1 and 0 lead to the same placement and the same final order. Verified by differential run: arrays of 2, 3, 10, 33, 70, 200 and 1000 all-equal keys, and 300 mixed keys, sorted with both comparators: identical order every time. The < to <= mutant on the same line is NOT equivalent and is killed by the stable-ties test."
@@ -32,6 +32,6 @@
  "capped": false,
  "timeoutMs": 60000,
  "clean": true,
- "seconds": 56,
+ "seconds": 409,
  "rerun": "git clone https://github.com/sjgant80-hub/witness && git -C witness checkout v0.6 && node gate.mjs --witness witness/witness.mjs"
 }

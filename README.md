@@ -4,7 +4,7 @@
 
 Deterministic quote & citation verification — **no LLM judge**. Paste source documents and the quotes
 an AI (or a person) claims come from them; CiteLock checks each claim against its source with plain
-substring search + Levenshtein similarity and classifies it **VERIFIED / NEAR MATCH / NOT FOUND**. Every
+whole-word search + Levenshtein similarity and classifies it **VERIFIED / NEAR MATCH / NOT FOUND**. Every
 run ends in a SHA-256 receipt anyone can reproduce byte-for-byte from the same inputs, plus a
 tamper-evident hash-chained session ledger you can export, edit, and re-import to see the chain break.
 
@@ -30,8 +30,8 @@ upload for the Agensi skill marketplace. CI builds the same ZIP on every push an
   byte-for-byte into `kernel.mjs` and into the skill script; CI fails if the three ever differ.
 - **Tests:** `npm test` runs the kernel tests, and runs the skill script alone in an empty folder, the way
   Agensi runs it, against the expected outputs in `examples/`.
-- **Mutation gate:** witness v0.6 made 38 single-operator mutants of `kernel.mjs` and the tests caught
-  36; the other 2 are equivalent mutants, reasons in `witness.baseline.json`. Receipt: `receipts/witness.json` (kernel SHA-256 `d1534bc802f6a242…`).
+- **Mutation gate:** witness v0.6 made 53 single-operator mutants of `kernel.mjs` and the tests caught
+  51; the other 2 are equivalent mutants, reasons in `witness.baseline.json`. Receipt: `receipts/witness.json` (kernel SHA-256 `74f090443842ff5d…`).
   CI re-runs the gate on every push: https://github.com/sjgant80-hub/kar-citelock/actions/workflows/ci.yml
 
 Powered by the Konomi architecture, created by Thomas Frumkin. MIT licence (see `LICENSE`).

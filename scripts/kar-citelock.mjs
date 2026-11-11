@@ -6,7 +6,7 @@
 // MIT licence.
 // ---- KERNEL (from index.html) ----
 /* ---------- constants ---------- */
-var ALGO_VERSION = 'citelock-v1';
+var ALGO_VERSION = 'citelock-v2';
 var NEAR_THRESHOLD = 0.90;
 var ZERO_HASH = '0'.repeat(64);
 
@@ -106,12 +106,32 @@ function contextSnippet(norm, idx, len, pad){
   return s;
 }
 
+// A letter or digit of a script written with spaces between words. Scripts written without them (Han, Hiragana,
+// Katakana, Thai, Lao, Khmer, Myanmar) have no word edges, so a quote in them may match anywhere, as in v1.
+var NO_SPACE_SCRIPTS = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
+function isWordChar(c){
+  return typeof c === 'string' && /^[\p{L}\p{N}]$/u.test(c) && !NO_SPACE_SCRIPTS.test(c);
+}
+
+// The first place the quote appears as whole words: it must not start or end in the middle of a word. v1 took any
+// substring, so "he said yes" was VERIFIED in "she said yes" and "lice" in "police".
+function findWhole(hay, needle){
+  var from = 0, i;
+  while ((i = hay.indexOf(needle, from)) !== -1){
+    var startsClean = !isWordChar(needle.charAt(0)) || !isWordChar(hay.charAt(i - 1));
+    var endsClean = !isWordChar(needle.charAt(needle.length - 1)) || !isWordChar(hay.charAt(i + needle.length));
+    if (startsClean && endsClean) return i;
+    from = i + 1;
+  }
+  return -1;
+}
+
 function verifyClaim(quoteRaw, src){
   var quote = normalize(quoteRaw);
   if (!quote) return { verdict:'EMPTY', similarity:0, excerpt:'' };
   if (!src || typeof src.norm !== 'string') return { verdict:'SOURCE_MISSING', similarity:0, excerpt:'' };
 
-  var idx = src.norm.indexOf(quote);
+  var idx = findWhole(src.norm, quote);
   if (idx !== -1){
     return { verdict:'VERIFIED', similarity:1, excerpt: contextSnippet(src.norm, idx, quote.length) };
   }
@@ -133,11 +153,23 @@ function verifyClaim(quoteRaw, src){
   }
   if (!best) return { verdict:'NOT_FOUND', similarity:0, excerpt:'' };
 
+  // The quote's exact text is there, but only inside longer words ("he said yes" in "she said yes"): measure it
+  // against the whole words it sits in, so the score and the excerpt show what the source really says.
+  var len = quote.length;
+  if (best.sim === 1){
+    var s = best.idx, e = best.idx + quote.length;
+    // charAt past either end is '', never a word character, so each loop stops at the edge of the source
+    while (isWordChar(src.norm.charAt(s - 1)) && isWordChar(src.norm.charAt(s))) s--;
+    while (isWordChar(src.norm.charAt(e)) && isWordChar(src.norm.charAt(e - 1))) e++;
+    best = { sim: similarity(quote, src.norm.slice(s, e)), idx: s };
+    len = e - s;
+  }
+
   var verdict = best.sim >= NEAR_THRESHOLD ? 'NEAR_MATCH' : 'NOT_FOUND';
   return {
     verdict: verdict,
     similarity: best.sim,
-    excerpt: contextSnippet(src.norm, best.idx, quote.length)
+    excerpt: contextSnippet(src.norm, best.idx, len)
   };
 }
 

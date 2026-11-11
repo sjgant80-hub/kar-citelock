@@ -2,7 +2,7 @@
   "exitCode": 1,
   "report": {
     "tool": "kar-citelock",
-    "algorithm": "citelock-v1",
+    "algorithm": "citelock-v2",
     "verdict": "NOT_ALL_VERIFIED",
     "summary": "NEAR_MATCH:1|NOT_FOUND:1|VERIFIED:1",
     "results": [
@@ -39,8 +39,8 @@
       }
     ],
     "receipt": {
-      "sha256": "dd2417527e3146f8c3ff428fc97a439d981cb7eaea1d32907a97a28a91e0d091",
-      "canonical": "{\"algorithm\":\"citelock-v1\",\"claims\":[{\"locator\":\"claimed 01:10 (fabricated)\",\"quote\":\"The company guarantees zero downtime for every customer forever.\",\"similarity\":\"0.0000\",\"source\":\"Fictional Keynote Transcript\",\"verdict\":\"NOT_FOUND\"},{\"locator\":\"00:41 (one word changed)\",\"quote\":\"we are asking the machine to show its work every single day, without exception\",\"similarity\":\"0.9359\",\"source\":\"Fictional Keynote Transcript\",\"verdict\":\"NEAR_MATCH\"},{\"locator\":\"00:41 (exact)\",\"quote\":\"we are asking the machine to show its work every single time, without exception\",\"similarity\":\"1.0000\",\"source\":\"Fictional Keynote Transcript\",\"verdict\":\"VERIFIED\"}],\"nearThreshold\":\"0.90\",\"sources\":[{\"label\":\"Fictional Keynote Transcript\",\"length\":457,\"sha256\":\"7e9b640dc0eef76f47af899b855186b60bed0f7e1ac59d07a1a65f9554ce9266\"}]}"
+      "sha256": "45ceeaf5e92d8b662ae70a43b3f8969c5ab4d5c0274af2bd47dda5f8d0ecdcdf",
+      "canonical": "{\"algorithm\":\"citelock-v2\",\"claims\":[{\"locator\":\"claimed 01:10 (fabricated)\",\"quote\":\"The company guarantees zero downtime for every customer forever.\",\"similarity\":\"0.0000\",\"source\":\"Fictional Keynote Transcript\",\"verdict\":\"NOT_FOUND\"},{\"locator\":\"00:41 (one word changed)\",\"quote\":\"we are asking the machine to show its work every single day, without exception\",\"similarity\":\"0.9359\",\"source\":\"Fictional Keynote Transcript\",\"verdict\":\"NEAR_MATCH\"},{\"locator\":\"00:41 (exact)\",\"quote\":\"we are asking the machine to show its work every single time, without exception\",\"similarity\":\"1.0000\",\"source\":\"Fictional Keynote Transcript\",\"verdict\":\"VERIFIED\"}],\"nearThreshold\":\"0.90\",\"sources\":[{\"label\":\"Fictional Keynote Transcript\",\"length\":457,\"sha256\":\"7e9b640dc0eef76f47af899b855186b60bed0f7e1ac59d07a1a65f9554ce9266\"}]}"
     }
   }
 }
