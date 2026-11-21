@@ -149,7 +149,7 @@
     <li><b>Check a claim</b> (<a href="#claim">just below</a>): a sentence and its sources in, <b>VERIFIED</b> or <b>REFUSED</b> out, with where each word, number and quotation was found. Any AI agent can run the same check itself: <a href="#agent">call it from your agent</a>.</li>
     <li><b>Check quotes</b> (<a href="#sourcesPanel">further down</a>): is each quote word for word in its source? <b>VERIFIED</b>, <b>NEAR_MATCH</b> (close but altered) or <b>NOT_FOUND</b>, with a receipt hash anyone can recompute.</li>
   </ul>
-  <p class="muted">Below the tools: <a href="#claim-how">how the claim check works</a> · <a href="#claim-limits">its limits</a> · <a href="#how">how the quote check works</a> · <a href="#ex-words">words on this page</a> · <a href="#blueprint">blueprint</a> · <a href="#adoption">roll it out</a> · <a href="#business">for a business</a> · <a href="#ex-faq">FAQ</a></p>
+  <p class="muted">Below the tools: <a href="#claim-how">how the claim check works</a> · <a href="#claim-limits">its limits</a> · <a href="#onchain">payment on proof</a> · <a href="#how">how the quote check works</a> · <a href="#ex-words">words on this page</a> · <a href="#blueprint">blueprint</a> · <a href="#adoption">roll it out</a> · <a href="#business">for a business</a> · <a href="#ex-faq">FAQ</a></p>
 </section>
 <!-- ⟦EXPLAIN-START-END⟧ -->
 
@@ -499,6 +499,31 @@
     <li><b>The sources themselves.</b> It confirms the words are in the sources you give it, not that the sources are true, complete or genuine.</li>
     <li><b>Who calls it.</b> It is a check any agent can call. It becomes a check shared between teams only once other teams' agents call it, and no outside caller is recorded yet.</li>
   </ul>
+</section>
+
+<section class="card ex" id="onchain">
+  <h2>Payment on proof: what is connected, and what is not</h2>
+  <p>A separate public project, <a href="https://github.com/sjgant80-hub/kar-paid-on-proof">kar-paid-on-proof</a>, has a smart contract, <a href="https://github.com/sjgant80-hub/kar-paid-on-proof/blob/0db09871024da6497c27177f96610cd7dd093d73/contracts/FulfilmentGate.sol">FulfilmentGate</a>, that holds a buyer agent's payment and releases it to a worker agent only on proof. People ask whether this claim check is that proof. It is not, and this is exactly what each one checks, read from the code (the contract at commit <code>0db0987</code>).</p>
+  <h3>What the contract checks before it pays</h3>
+  <ol>
+    <li>The worker's deliverable is an answer made only of passages copied from the sources, each cited as a document number and a start and end <b>byte</b> offset.</li>
+    <li>The named verifier has answered PASS (100 out of 100) for this exact deliverable in a validation registry on the chain (<a href="https://github.com/sjgant80-hub/kar-paid-on-proof/blob/0db09871024da6497c27177f96610cd7dd093d73/contracts/FulfilmentGate.sol#L159-L171"><code>release</code></a>, <a href="https://github.com/sjgant80-hub/kar-paid-on-proof/blob/0db09871024da6497c27177f96610cd7dd093d73/contracts/FulfilmentGate.sol#L209-L213"><code>_verdict</code></a>). That verifier's own rule, in the project's <a href="https://github.com/sjgant80-hub/kar-paid-on-proof/blob/0db09871024da6497c27177f96610cd7dd093d73/sdk/verify.mjs">sdk/verify.mjs</a>, also asks, by default, that the copied words cover at least half of the question's terms; the chain cannot re-run that part and relies on the signature.</li>
+    <li>The chain then re-checks it itself (<a href="https://github.com/sjgant80-hub/kar-paid-on-proof/blob/0db09871024da6497c27177f96610cd7dd093d73/contracts/FulfilmentGate.sol#L215-L232"><code>_checkGrounded</code></a>): the 1 to 16 source documents hash to the sources the buyer committed to; the answer and its citations hash to what the worker submitted; there are 1 to 8 citations, each inside its document; and the answer is exactly the cited byte ranges joined by single spaces, byte for byte, with nothing evened out. Otherwise the payment does not move.</li>
+  </ol>
+  <h3>How that differs from this claim check</h3>
+  <div class="ex-wrap"><table>
+    <thead><tr><th></th><th>FulfilmentGate (on the chain)</th><th>This claim check (verify)</th></tr></thead>
+    <tbody>
+      <tr><td>What may be checked</td><td>An answer that is nothing but copied passages</td><td>Any sentence: quotations, plus the words and numbers around them</td></tr>
+      <tr><td>Word for word means</td><td>The exact bytes, nothing evened out</td><td>After spacing, curly quote marks and dashes are evened out; whole words</td></tr>
+      <tr><td>Offsets</td><td>UTF-8 byte offsets, given by the worker and checked</td><td>Character offsets, found by the check and reported</td></tr>
+      <tr><td>Words outside quotations</td><td>Not allowed: everything must be copied</td><td>Each content word and number must be in a cited source</td></tr>
+      <tr><td>Sources</td><td>Committed in advance by their hashes</td><td>Passed in with the claim; not fixed in advance</td></tr>
+      <tr><td>Who must agree</td><td>A named verifier signs PASS, and the chain re-checks the copying</td><td>Nobody signs; anyone can re-run it and get the same answer</td></tr>
+      <tr><td>What it moves</td><td>Money, from escrow to the worker or back to the buyer</td><td>Nothing: it answers VERIFIED or REFUSED</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Binding the two is not done.</b> Nothing in the contract runs this check, and nothing in this project produces what the contract takes. A claim this page calls VERIFIED does not release any payment, and a payment the contract releases was not decided by this check. Joining them would need code that does not exist today, for example a verifier that runs this check and signs its verdict where the contract reads it. This page makes no claim about where the contract is deployed; its own project says that.</p>
 </section>
 
   <footer>

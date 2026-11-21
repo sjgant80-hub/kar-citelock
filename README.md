@@ -42,6 +42,15 @@ constructor"); npm 11 can, and the plain line works on all three.
 The live page has the same check in a box you can type into, and traces a real call to the server step by step
 (`trace/mcp-call.in.jsonl` is what an agent sent, `trace/mcp-call.out.jsonl` what the server answered; CI re-runs it).
 
+## Payment on proof: not connected to this check
+
+The public project [kar-paid-on-proof](https://github.com/sjgant80-hub/kar-paid-on-proof) has a contract,
+`FulfilmentGate`, that releases an escrowed payment only when a named verifier signs PASS and the chain re-checks that
+the answer is exactly the cited byte ranges of committed sources, joined by single spaces. That is a different check
+from `verify()` here (exact bytes and copy-only answers there; evened-out quotations plus words and numbers here), and
+binding the two is not done: nothing in the contract runs this check. The live page compares them line by line, with
+links to the contract's code.
+
 ## Use it from an agent
 
 `SKILL.md` makes this repository an agent skill in the open SKILL.md format (Claude Code, Codex CLI, Cursor and
