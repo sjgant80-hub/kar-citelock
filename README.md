@@ -35,7 +35,12 @@ and the limits). In an MCP client's config:
 
 or in Claude Code: `claude mcp add kar-citelock -- npx -y github:sjgant80-hub/kar-citelock`. `mcp.test.mjs` spawns
 the server and speaks MCP to it; CI also runs that line itself, from GitHub, from an empty folder, on every commit.
-npx needs git on the machine.
+npx needs git on the machine. CI runs the line on Node 20, 22 and 24. npm 10 (Node 20 and 22) cannot run it pinned to
+a full commit hash (`github:sjgant80-hub/kar-citelock#<hash>` stops with "GitFetcher requires an Arborist
+constructor"); npm 11 can, and the plain line works on all three.
+
+The live page has the same check in a box you can type into, and traces a real call to the server step by step
+(`trace/mcp-call.in.jsonl` is what an agent sent, `trace/mcp-call.out.jsonl` what the server answered; CI re-runs it).
 
 ## Use it from an agent
 
@@ -59,5 +64,7 @@ upload for the Agensi skill marketplace. CI builds the same ZIP on every push an
   CI re-runs the gate on every push: https://github.com/sjgant80-hub/kar-citelock/actions/workflows/ci.yml
 - **The MCP server:** witness v0.6 made 18 mutants of `mcp.mjs` and 2 of `stdio.mjs`; `mcp.test.mjs` caught all 20,
   with no exemptions, and `handleRpc` never throws on the fuzz battery. CI re-runs both on every push.
+- **The page code:** `claim-page.js` draws the claim box and the recorded call; `page.test.mjs` loads the page without
+  a browser, presses its buttons and compares what it shows with the kernel. witness: 18 of 18 mutants caught, none excused.
 
 Powered by the Konomi architecture, created by Thomas Frumkin. MIT licence (see `LICENSE`).

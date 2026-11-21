@@ -3,13 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CiteLock — Deterministic Quote Verifier</title>
+<title>CiteLock — Quote and Claim Checker</title>
 <style>
   :root{
     --bg:#0b0d10; --panel:#12161b; --panel2:#171c22; --border:#232a32;
     --text:#e6edf3; --muted:#8b98a5; --accent:#5fd6c9; --accent2:#3fa89b;
     --good:#3fb950; --good-bg:#0f2a17; --warn:#d29922; --warn-bg:#2b2107;
     --bad:#f85149; --bad-bg:#2b0f0f; --focus:#5fd6c9;
+    --soft:#c7d1db; --on-accent:#062018; --code-bg:#0f1318;
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f6f7f9; --panel:#ffffff; --panel2:#f0f2f5; --border:#d3d9e0;
+      --text:#14181d; --muted:#56616d; --accent:#0d7368; --accent2:#0a5850;
+      --good:#1a7f37; --good-bg:#e3f4e8; --warn:#8a5a00; --warn-bg:#fdf1d3;
+      --bad:#c0262d; --bad-bg:#fde7e7; --focus:#0d7368;
+      --soft:#2b333c; --on-accent:#ffffff; --code-bg:#eef1f4;
+      color-scheme: light;
+    }
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -33,7 +45,7 @@
   .muted{color:var(--muted);}
   .small{font-size:12px;}
   p{margin:8px 0;}
-  .intro p{color:#c7d1db;}
+  .intro p{color:var(--soft);}
   .limits{border-top:1px dashed var(--border);margin-top:12px;padding-top:10px;font-size:13px;color:var(--muted);}
   label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;}
   input[type=text], textarea, select{
@@ -45,7 +57,7 @@
   .row{display:flex;gap:10px;flex-wrap:wrap;}
   .row > div{flex:1;min-width:180px;}
   button{
-    background:var(--accent); color:#062018; border:none; border-radius:7px;
+    background:var(--accent); color:var(--on-accent); border:none; border-radius:7px;
     padding:9px 14px; font-size:14px; font-weight:600; cursor:pointer;
   }
   button:hover{background:var(--accent2);color:#fff;}
@@ -61,7 +73,7 @@
   }
   .list-item .meta{font-size:12px;color:var(--muted);margin-top:4px;word-break:break-all;}
   .list-item .body{flex:1;min-width:0;}
-  .list-item .qtext{font-size:13px;color:#dce4ec;white-space:pre-wrap;}
+  .list-item .qtext{font-size:13px;color:var(--soft);white-space:pre-wrap;}
   .list-item .lbl{font-weight:600;font-size:14px;}
   .empty-note{color:var(--muted);font-size:13px;font-style:italic;padding:6px 2px;}
   table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -78,7 +90,7 @@
   .badge.NOT_FOUND{background:var(--bad-bg);color:var(--bad);}
   .badge.SOURCE_MISSING{background:var(--bad-bg);color:var(--bad);}
   .badge.EMPTY{background:var(--border);color:var(--muted);}
-  .summaryline{font-size:13px;color:#c7d1db;margin-bottom:8px;}
+  .summaryline{font-size:13px;color:var(--soft);margin-bottom:8px;}
   .hashbox{
     font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px;
     background:var(--panel2); border:1px solid var(--border); border-radius:7px; padding:10px;
@@ -96,10 +108,28 @@
   .hidden{display:none !important;}
   .divider{height:1px;background:var(--border);margin:12px 0;}
   .threshold-note{font-size:11px;color:var(--muted);}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;margin:14px 0;}
+  .card h2{margin:0 0 8px;font-size:18px;}
+  /* the claim check and the agent section */
+  .steps{padding-left:1.3em;margin:8px 0;} .steps li{margin:.3em 0;}
+  .src-row{display:grid;grid-template-columns:110px 1fr auto;gap:8px;align-items:start;margin-top:8px;}
+  .src-row input[type=text]{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;}
+  .code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;background:var(--code-bg);
+    border:1px solid var(--border);border-radius:7px;padding:10px;margin:6px 0;white-space:pre-wrap;word-break:break-word;overflow-x:auto;}
+  .verdict-line{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 4px;font-size:14px;}
+  .badge.REFUSED{background:var(--bad-bg);color:var(--bad);}
+  .reasons{margin:6px 0;padding-left:1.2em;color:var(--soft);font-size:13px;}
+  .trace td .hit{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:var(--good-bg);color:var(--text);padding:0 3px;border-radius:3px;}
+  .ok-yes{color:var(--good);font-weight:600;} .ok-no{color:var(--bad);font-weight:600;}
+  details summary{cursor:pointer;color:var(--accent);font-size:13px;margin-top:8px;}
+  .trace-call{border-top:1px dashed var(--border);margin-top:12px;padding-top:10px;}
+  .trace-call ol{padding-left:1.3em;} .trace-call li{margin:.3em 0;}
+  .match-yes{color:var(--good);} .match-no{color:var(--bad);font-weight:600;}
   @media (max-width:600px){
     header h1{font-size:22px;}
     .btnbar button{flex:1;}
     .list-item{flex-direction:column;}
+    .src-row{grid-template-columns:1fr;}
     th,td{padding:6px 5px;}
   }
 </style>
@@ -109,16 +139,72 @@
 
   <header>
     <h1><span class="lock">CiteLock</span></h1>
-    <div class="tag">Deterministic, third-party re-runnable quote &amp; citation verification. No AI judge — just text matching and SHA-256.</div>
+    <div class="tag">Checks quotes and whole claims against their sources, with fixed rules anyone can re-run, here or from any AI agent. No AI judge: text matching, offsets and SHA-256.</div>
   </header>
 <!-- ⟦EXPLAIN-START-BEGIN⟧ generated by gen.cjs -->
 <section class="card ex" id="start">
   <h2>Start here</h2>
-  <p>Kar-Citelock tells you whether every quote attributed to a source document really appears in that source, word for word. It runs entirely in this page: nothing you paste is sent anywhere, and no AI judges anything.</p>
-  <ol class="ex-steps"><li>Add each source document (or press <b>Load demo</b>).</li><li>Add each claimed quote and the source it is attributed to.</li><li>Press <b>Run verification</b>.</li><li>Read each quote's verdict: <b>VERIFIED</b> (found word for word), <b>NEAR_MATCH</b> (close but altered) or <b>NOT_FOUND</b>; keep the receipt hash.</li></ol>
-  <p class="muted">Below the tool: <a href="#how">how it works</a> · <a href="#ex-words">words on this page</a> · <a href="#blueprint">blueprint</a> · <a href="#adoption">roll it out</a> · <a href="#business">for a business</a> · <a href="#ex-faq">FAQ</a></p>
+  <p>Kar-Citelock checks what an AI (or a person) says against the documents it says it comes from. It does two jobs, both with fixed rules and no AI judging anything, and both run entirely in this page: nothing you paste is sent anywhere.</p>
+  <ul>
+    <li><b>Check a claim</b> (<a href="#claim">just below</a>): a sentence and its sources in, <b>VERIFIED</b> or <b>REFUSED</b> out, with where each word, number and quotation was found. Any AI agent can run the same check itself: <a href="#agent">call it from your agent</a>.</li>
+    <li><b>Check quotes</b> (<a href="#sourcesPanel">further down</a>): is each quote word for word in its source? <b>VERIFIED</b>, <b>NEAR_MATCH</b> (close but altered) or <b>NOT_FOUND</b>, with a receipt hash anyone can recompute.</li>
+  </ul>
+  <p class="muted">Below the tools: <a href="#claim-how">how the claim check works</a> · <a href="#claim-limits">its limits</a> · <a href="#how">how the quote check works</a> · <a href="#ex-words">words on this page</a> · <a href="#blueprint">blueprint</a> · <a href="#adoption">roll it out</a> · <a href="#business">for a business</a> · <a href="#ex-faq">FAQ</a></p>
 </section>
 <!-- ⟦EXPLAIN-START-END⟧ -->
+
+<section class="panel" id="claim">
+  <h2>Check a claim against its sources</h2>
+  <p>Paste a claim, for example a sentence an AI wrote, and the sources it rests on. The answer is <b>VERIFIED</b> only when all three hold:</p>
+  <ol class="steps">
+    <li>every quotation in the claim (the words between double quote marks) is word for word in a cited source;</li>
+    <li>every content word outside the quotations is in a cited source;</li>
+    <li>every number outside the quotations is in a cited source.</li>
+  </ol>
+  <p>Anything less is <b>REFUSED</b>, with one reason for each part that failed. The table shows every check and where in the source it was found. Mark which source a sentence rests on with <code>[id]</code>, for example <code>[report]</code>; a claim with no marker is checked against every source.</p>
+  <p class="small muted"><b>Start here:</b> press <b>Load a true claim</b>, then <b>Verify</b>. Then <b>Load a false claim</b> and verify again, and compare the reasons. Then type your own.</p>
+  <label for="mClaim">Claim</label>
+  <textarea id="mClaim" rows="3" placeholder="e.g. Revenue rose 12% in 2025 [report]."></textarea>
+  <div id="mSources"></div>
+  <div class="btnbar">
+    <button type="button" id="mVerify">Verify</button>
+    <button type="button" class="ghost" id="mLoadTrue">Load a true claim</button>
+    <button type="button" class="ghost" id="mLoadFalse">Load a false claim</button>
+    <button type="button" class="ghost" id="mAddSource">Add a source</button>
+    <button type="button" class="ghost" id="mClear">Clear</button>
+  </div>
+  <p class="small muted">A source with no id is cited by its position: 1, 2, 3. The examples are made up for this page.</p>
+  <div id="mOut" class="hidden" aria-live="polite">
+    <div class="verdict-line"><span id="mVerdict" class="badge"></span><span id="mSummary" class="small muted"></span></div>
+    <ul class="reasons" id="mReasons"></ul>
+    <div class="tablewrap"><table class="trace"><thead><tr><th>check</th><th>what</th><th>found</th><th>where in the source</th></tr></thead><tbody id="mTrace"></tbody></table></div>
+    <p class="small muted" id="mSkipped"></p>
+    <details><summary>What an agent receives (the same JSON the MCP server returns)</summary><pre class="code" id="mJson"></pre></details>
+  </div>
+</section>
+
+<section class="panel" id="agent">
+  <h2>Call it from your agent</h2>
+  <p>Any AI agent that speaks MCP (the Model Context Protocol, the way agents such as Claude call tools) can run this same check on its own machine, with no account and no key. One line starts it:</p>
+  <pre class="code" id="aNpx">npx -y github:sjgant80-hub/kar-citelock</pre>
+  <div class="copybar"><button type="button" class="ghost small-btn" data-copy="aNpx">Copy</button></div>
+  <p>In an MCP client's settings (Claude Desktop, Cursor and others take this shape):</p>
+  <pre class="code" id="aConfig">{
+  "mcpServers": {
+    "kar-citelock": { "command": "npx", "args": ["-y", "github:sjgant80-hub/kar-citelock"] }
+  }
+}</pre>
+  <div class="copybar"><button type="button" class="ghost small-btn" data-copy="aConfig">Copy</button></div>
+  <p>In Claude Code:</p>
+  <pre class="code" id="aClaude">claude mcp add kar-citelock -- npx -y github:sjgant80-hub/kar-citelock</pre>
+  <div class="copybar"><button type="button" class="ghost small-btn" data-copy="aClaude">Copy</button></div>
+  <p>The server has two tools. <code>verify_claim</code> takes <code>{ claim, sources }</code> and returns VERIFIED or REFUSED, the reasons and the trace, exactly as the box above shows. <code>about</code> returns the rules and the limits in plain words. Tell your agent to call <code>verify_claim</code> before it states anything it says a source supports, and to stop, or say so, when the answer is REFUSED.</p>
+  <ul class="small muted">
+    <li>Needs Node.js 20 or later and git. It reads its questions on stdin and writes its answers on stdout: no network, nothing written to disk, nothing sent to us.</li>
+    <li>On every change, GitHub's computers run that exact npx line from an empty folder on Node 20, 22 and 24, spawn the server and check a true claim comes back VERIFIED and a false one REFUSED: <a href="https://github.com/sjgant80-hub/kar-citelock/actions/workflows/ci.yml">the runs, in public</a>.</li>
+    <li>npm 10 (Node 20 and 22) cannot run it pinned to a full commit hash (<code>github:sjgant80-hub/kar-citelock#&lt;hash&gt;</code>); npm 11 can. The plain line above works on all three.</li>
+  </ul>
+</section>
 
 
 
@@ -310,6 +396,10 @@
     <li><b>One source of truth.</b> The checking logic is the KERNEL block inside this page. <code>build.mjs</code> copies it byte for byte into <code>kernel.mjs</code> (which the tests and the mutation gate run) and into <code>scripts/kar-citelock.mjs</code> (the one-file agent skill). CI fails if the three ever differ, so the page you use, the code that is proven and the script an agent runs are the same code.</li>
     <li><b>Tests.</b> <code>kernel.test.mjs</code> tests the kernel; <code>skill.test.mjs</code> runs the shipped script on its own, the way an agent platform runs it, against the expected outputs in <code>examples/</code>.</li>
     <li><b>Mutation gate.</b> <a href="https://github.com/sjgant80-hub/witness">witness</a> makes one small change to the kernel at a time (a <code>&lt;</code> becomes <code>&lt;=</code>, an <code>&amp;&amp;</code> becomes <code>||</code>) and re-runs the tests. Every change must make a test fail: that proves the tests check each of those points, rather than just running the code (see <a href="#ex-words">Mutation gate</a> in Words on this page). From <a href="receipts/witness.json">receipts/witness.json</a>: <span id="ex-gate">reading the receipt…</span></li>
+    <li><b>The claim check.</b> <code>verify({ claim, sources })</code> is in the same KERNEL block, so the box at the top of this page, <code>kernel.mjs</code> and the agent server run the same code, and the mutation gate above covers it: the numbers there are for the whole kernel, quote check and claim check together. It never throws: input it cannot use is REFUSED with the reason.</li>
+    <li><b>The agent server.</b> <code>mcp.mjs</code> answers MCP messages (initialize, tools/list, tools/call for <code>verify_claim</code> and <code>about</code>) and <code>stdio.mjs</code> runs it one line at a time on stdin and stdout. <code>mcp.test.mjs</code> starts the server as its own process and speaks MCP to it. witness tests those tests too (18 of 18 changes to <code>mcp.mjs</code> and 2 of 2 to <code>stdio.mjs</code> caught, none excused), and CI runs the npx line from GitHub on Node 20, 22 and 24.</li>
+    <li><b>The page code.</b> The claim box, the trace table and the recorded call on this page are drawn by <code>claim-page.js</code>, which decides nothing itself: every verdict comes from the kernel. <code>page.test.mjs</code> loads this page without a browser, presses its buttons and checks what it shows against the kernel; witness caught 18 of 18 changes to <code>claim-page.js</code>, none excused.</li>
+    <li><b>The recorded call.</b> <code>trace/mcp-call.in.jsonl</code> is what an agent sent; <code>trace/mcp-call.out.jsonl</code> is what the server answered. CI re-runs the server on the first and fails if the answers differ from the second, so the trace on this page stays true.</li>
     <li><b>The cost case below</b> is calculated by a separate small piece of code, <code>checkcase.mjs</code>, tested and mutation-gated in the same way as the kernel, in its own CI job. It uses only published figures (the UK median wage and UK inflation), each linked under the table.</li>
     <li><b>CI</b> re-runs all of it on GitHub's computers on every change: <a href="https://github.com/sjgant80-hub/kar-citelock/actions">every run, in public</a>.</li>
   </ul>
@@ -320,14 +410,15 @@
     <li><b>Pick one place</b> where this check is done by hand today, or skipped, and the person who owns it.</li>
     <li><b>Try it here</b> on real examples from that place. Nothing leaves the page.</li>
     <li><b>Put it in the flow.</b> Run <code>node scripts/kar-citelock.mjs input.json</code> in CI or a script (Node.js 20 or later, no dependencies). Exit code 0 means every quote is VERIFIED, 1 means at least one is not, 2 means the input could not be read. An AI agent can run the same script as a skill.</li>
-    <li><b>Keep the receipts</b> with the work they checked, so anyone can recompute a verdict later.</li>
+    <li><b>Give your agents the claim check.</b> Add the MCP server (<a href="#agent">one line</a>), and tell each agent to call <code>verify_claim</code> before it states anything it says a source supports. Decide what REFUSED means in that flow: rewrite the sentence, quote the source instead, or flag it for a person.</li>
+    <li><b>Keep the receipts</b> with the work they checked, so anyone can recompute a verdict later. For a claim, keep the trace: it says where each word and number came from.</li>
     <li><b>Measure the difference</b> with the cost case below.</li>
   </ol>
 </section>
 <section class="card ex" id="business">
   <h2>For a business</h2>
   <p>Kar-Citelock turns a check that is usually done by eye, or not at all, into a verdict anyone can recompute: the same input gives the same answer and the same SHA-256 receipt on any machine, with no AI judging it.</p>
-  <ul><li><b>CEO.</b> A misquote in a report, a summary or a chatbot answer is caught before it is published under your name.</li><li><b>CFO.</b> Checking quotes by hand becomes a verdict per quote in seconds; the case below works it out on your volumes. MIT open-source licence, no licence fee.</li><li><b>COO.</b> One step before anything quoted goes out: sources and quotes in, a verdict per quote out.</li><li><b>CTO / CISO.</b> No AI judge and no network: the same input gives the same verdicts and receipt on any machine. Its tests are themselves tested by a mutation gate (see Words on this page); the code is kernel.mjs, in public.</li><li><b>Legal and compliance.</b> Attribution you can show: each verdict with a receipt anyone can recompute from the same source.</li><li><b>The teams.</b> Writers and reviewers get the exact word that differs, not a vague doubt.</li></ul>
+  <ul><li><b>CEO.</b> A misquote in a report, a summary or a chatbot answer is caught before it is published under your name.</li><li><b>CFO.</b> Checking quotes by hand becomes a verdict per quote in seconds; the case below works it out on your volumes. MIT open-source licence, no licence fee.</li><li><b>COO.</b> One step before anything quoted goes out: sources and quotes in, a verdict per quote out.</li><li><b>Heads of AI and automation.</b> One tool call any MCP agent can make before it states a sourced claim: VERIFIED, or REFUSED with the reason and the place, on the agent's own machine, with no account.</li><li><b>CTO / CISO.</b> No AI judge and no network: the same input gives the same verdicts and receipt on any machine. Its tests are themselves tested by a mutation gate (see Words on this page); the code is kernel.mjs, in public.</li><li><b>Legal and compliance.</b> Attribution you can show: each verdict with a receipt anyone can recompute from the same source.</li><li><b>The teams.</b> Writers and reviewers get the exact word that differs, not a vague doubt.</li></ul>
   <h3>The cost case, on your numbers</h3>
   <p class="muted">What the checking costs today against running the tool. Staff time is at the UK median hourly wage with on-costs left out, so this is a floor; later years rise with UK inflation (CPI). Change any box to your own numbers and the table recalculates as you type.</p>
   <p class="muted"><b>How it is worked out.</b> Today: checks a year (per week × 52) × minutes per check × the median hourly wage, plus anything you pay for a tool now. With the tool: the share it replaces takes the seconds you enter instead of the minutes, and the rest is still checked by hand. Each later year rises by one more year of inflation.</p>
@@ -345,7 +436,7 @@
   <div class="ex-wrap"><table><thead><tr><th>year</th><th>checking by hand</th><th>with Kar-Citelock</th><th>saved</th></tr></thead><tbody id="ex-rows"></tbody></table></div>
   <p class="muted" id="ex-sources"></p>
   <h3>Against what you do now</h3>
-  <ul><li><b>Searching the source by hand.</b> Slow, and a changed word in a long quote is easy to miss.</li><li><b>Trusting the summary or the model.</b> AI summaries can alter or invent quotes, and nothing shows which.</li><li><b>Asking a model to check.</b> Its answer is not reproducible and cannot be recomputed by anyone else.</li></ul>
+  <ul><li><b>Searching the source by hand.</b> Slow, and a changed word in a long quote is easy to miss.</li><li><b>Trusting the summary or the model.</b> AI summaries can alter or invent quotes, and nothing shows which.</li><li><b>Asking a model to check.</b> Its answer is not reproducible and cannot be recomputed by anyone else.</li><li><b>Trusting the citation marks an AI adds.</b> A [1] after a sentence says where it came from, not that the source says it. The claim check opens the source and looks.</li></ul>
   <h3>Security, data protection and deployment</h3>
   <ul>
     <li>The page runs entirely in your browser; nothing you paste is sent anywhere. It can be served from your own intranet unchanged.</li>
@@ -355,21 +446,67 @@
   <h3>Support and ownership</h3>
   <p>Supplied by <a href="https://www.ai-nativesolutions.com">AI Native Solutions</a>; start through that site. Support, any service level, warranty and liability are agreed per deployment, in each deployment's agreement. The software is MIT and keeps running without us.</p>
   <h3>Where it stops, answered straight</h3>
-  <ul><li><b>The source itself.</b> It confirms text is in the source you supplied, not that the source is authentic.</li><li><b>Meaning out of context.</b> A verbatim quote can still mislead; that is a human judgement.</li><li><b>Short quotes.</b> The near-match threshold is fixed at 0.90, so one changed word in a quote of a few words can read NOT_FOUND rather than NEAR_MATCH.</li></ul>
+  <ul><li><b>The source itself.</b> It confirms text is in the source you supplied, not that the source is authentic.</li><li><b>Meaning out of context.</b> A verbatim quote can still mislead; that is a human judgement.</li><li><b>Claims, not meaning.</b> The claim check confirms the words and numbers are in the cited sources; it cannot tell whether they are joined the way the claim joins them. The <a href="#claim-limits">limits</a> show where, with examples you can run.</li><li><b>Short quotes.</b> The near-match threshold is fixed at 0.90, so one changed word in a quote of a few words can read NOT_FOUND rather than NEAR_MATCH.</li></ul>
   <h3>The case for the board</h3>
   <p>A check that anyone can recompute replaces a check that has to be trusted, at no licence cost, without sending your data anywhere. Its logic is the code on this page, and its tests are themselves tested.</p>
 </section>
 <section class="card ex" id="ex-faq">
   <h2>FAQ</h2>
-  <dl><dt><b>Why NEAR_MATCH and not just found or not?</b></dt><dd>Because the dangerous case is a quote that is almost right: one word changed, a number altered. NEAR_MATCH says it is close and shows you it is not the same.</dd><dt><b>Can an agent run it?</b></dt><dd>Yes. The same kernel ships as a one-file Node.js script (<code>scripts/kar-citelock.mjs</code>), usable as an agent skill before it quotes anything.</dd><dt><b>What happens with bad, empty or very large input?</b></dt><dd>A quote naming a source that is not loaded gets SOURCE_MISSING. On the page an empty quote gets EMPTY; the script refuses one as bad input (exit 2), as it does a file without a sources list and a claims list. Quotes under three words cannot be fuzzy-matched (see Limits). There is no size cap; the near-match search takes longer on long quotes and long sources.</dd><dt><b>What do I need to run it?</b></dt><dd>For the page, a modern browser; there is nothing to install. For the script, Node.js 20 or later (free from <a href="https://nodejs.org">nodejs.org</a>; <code>node --version</code> shows which one you have): download <code>scripts/kar-citelock.mjs</code> (one file, no dependencies, no <code>npm install</code>) and run it with no arguments to see how to call it.</dd><dt><b>Does it need the internet or an account?</b></dt><dd>No. The page works once loaded, and the script runs offline. Nothing is uploaded.</dd></dl>
+  <dl><dt><b>Why NEAR_MATCH and not just found or not?</b></dt><dd>Because the dangerous case is a quote that is almost right: one word changed, a number altered. NEAR_MATCH says it is close and shows you it is not the same.</dd><dt><b>Can an agent run it?</b></dt><dd>Yes, two ways. Any MCP agent can start the claim check with <code>npx -y github:sjgant80-hub/kar-citelock</code> (<a href="#agent">details</a>). And the quote check ships as a one-file Node.js script (<code>scripts/kar-citelock.mjs</code>), usable as an agent skill before it quotes anything.</dd><dt><b>What is the difference between VERIFIED here and true?</b></dt><dd>VERIFIED means the words, numbers and quotations of the claim are in the sources it cites. It does not mean the claim is a fair reading of them, or that the sources are right. See <a href="#claim-limits">where the claim check stops</a>.</dd><dt><b>What happens with bad, empty or very large input?</b></dt><dd>A quote naming a source that is not loaded gets SOURCE_MISSING. On the page an empty quote gets EMPTY; the script refuses one as bad input (exit 2), as it does a file without a sources list and a claims list. Quotes under three words cannot be fuzzy-matched (see Limits). There is no size cap; the near-match search takes longer on long quotes and long sources.</dd><dt><b>What do I need to run it?</b></dt><dd>For the page, a modern browser; there is nothing to install. For the script, Node.js 20 or later (free from <a href="https://nodejs.org">nodejs.org</a>; <code>node --version</code> shows which one you have): download <code>scripts/kar-citelock.mjs</code> (one file, no dependencies, no <code>npm install</code>) and run it with no arguments to see how to call it.</dd><dt><b>Does it need the internet or an account?</b></dt><dd>No. The page works once loaded, and the script runs offline. Nothing is uploaded.</dd></dl>
 </section>
 <!-- ⟦EXPLAIN-REST-END⟧ -->
 
+<section class="card ex" id="claim-how">
+  <h2>How the claim check works, traced from a real call</h2>
+  <svg class="ex-svg" viewBox="0 0 640 150" role="img" aria-label="A claim and its sources go through four checks in order: citations, quotations, numbers, content words. All pass gives VERIFIED; any failure gives REFUSED with its reason. Every check goes into the trace with its offsets.">
+    <rect x="6" y="40" width="110" height="64" rx="8" class="ex-b"/><text x="61" y="66" text-anchor="middle" class="ex-t">claim</text><text x="61" y="82" text-anchor="middle" class="ex-s">+ its sources</text>
+    <line x1="116" y1="72" x2="130" y2="72" class="ex-l"/>
+    <rect x="130" y="40" width="94" height="64" rx="8" class="ex-b"/><text x="177" y="62" text-anchor="middle" class="ex-t">1 citations</text><text x="177" y="78" text-anchor="middle" class="ex-s">[id] is a</text><text x="177" y="91" text-anchor="middle" class="ex-s">source given</text>
+    <line x1="224" y1="72" x2="236" y2="72" class="ex-l"/>
+    <rect x="236" y="40" width="94" height="64" rx="8" class="ex-b"/><text x="283" y="62" text-anchor="middle" class="ex-t">2 quotations</text><text x="283" y="78" text-anchor="middle" class="ex-s">word for word,</text><text x="283" y="91" text-anchor="middle" class="ex-s">whole words</text>
+    <line x1="330" y1="72" x2="342" y2="72" class="ex-l"/>
+    <rect x="342" y="40" width="94" height="64" rx="8" class="ex-b"/><text x="389" y="62" text-anchor="middle" class="ex-t">3 numbers</text><text x="389" y="78" text-anchor="middle" class="ex-s">each one in a</text><text x="389" y="91" text-anchor="middle" class="ex-s">cited source</text>
+    <line x1="436" y1="72" x2="448" y2="72" class="ex-l"/>
+    <rect x="448" y="40" width="94" height="64" rx="8" class="ex-b"/><text x="495" y="62" text-anchor="middle" class="ex-t">4 words</text><text x="495" y="78" text-anchor="middle" class="ex-s">each content</text><text x="495" y="91" text-anchor="middle" class="ex-s">word found</text>
+    <line x1="542" y1="72" x2="554" y2="72" class="ex-l"/>
+    <rect x="554" y="20" width="80" height="44" rx="8" class="ex-b"/><text x="594" y="40" text-anchor="middle" class="ex-t">VERIFIED</text><text x="594" y="54" text-anchor="middle" class="ex-s">all passed</text>
+    <rect x="554" y="80" width="80" height="44" rx="8" class="ex-b"/><text x="594" y="100" text-anchor="middle" class="ex-t">REFUSED</text><text x="594" y="114" text-anchor="middle" class="ex-s">a reason each</text>
+    <text x="320" y="140" text-anchor="middle" class="ex-s">every check goes into the trace: what it looked for, the source it found it in, and where (character offsets)</text>
+  </svg>
+  <ol>
+    <li><b>Citations.</b> Each <code>[id]</code> outside the quotations must name a source that was given. The cited sources, in the order the claim cites them, are the only ones searched. With no marker, all are.</li>
+    <li><b>Quotations.</b> Each passage between double quote marks must appear word for word in a cited source, capitals included, starting and ending on whole words. Spacing, curly quote marks and dashes are evened out first. If it is not there, the closest passage that is a near match is shown.</li>
+    <li><b>Numbers.</b> Each number outside the quotations must appear in a cited source. Thousands commas are taken out (1,200 and 1200 match); otherwise a number is compared as written.</li>
+    <li><b>Content words.</b> Each word outside the quotations must appear in a cited source, ignoring capitals and simple plurals. Small English words such as "the" and "said" are skipped, and the trace lists them.</li>
+  </ol>
+  <p>The call below is real. These are the messages an agent sent to the MCP server and the answers it gave, recorded by running the server (<code>node stdio.mjs</code>) on <a href="trace/mcp-call.in.jsonl">trace/mcp-call.in.jsonl</a>; the answers are <a href="trace/mcp-call.out.jsonl">trace/mcp-call.out.jsonl</a>. GitHub re-runs the server on the same messages on every change and fails if any answer differs. This page also runs the same claims through its own copy of the check and says whether it gets the same answers.</p>
+  <div id="traceOut"><p class="muted">Reading the recorded call…</p></div>
+</section>
+
+<section class="card ex" id="claim-limits">
+  <h2>Where the claim check stops, in plain words</h2>
+  <ul>
+    <li><b>It does not understand meaning.</b> It checks words, numbers and offsets. That is what makes it the same on every machine and checkable by anyone, and it is also its limit.</li>
+    <li><b>Words that are there, joined differently.</b> It checks that each word and number is in a cited source, not that they are joined the way the claim joins them. "revenue rose 12%" passes against "Revenue rose 3% and costs rose 12%." <button type="button" class="ghost small-btn" data-limit="joined">Try it</button></li>
+    <li><b>A word the claim leaves out.</b> It cannot see what the claim drops. "The board did approve the merger." passes against "The board did not approve the merger." A "not" the claim adds is caught, unless the word is somewhere in the cited sources; a "not" it drops never is. <button type="button" class="ghost small-btn" data-limit="dropped">Try it</button></li>
+    <li><b>Small words.</b> These English words are skipped, and every trace lists the ones it skipped: <span id="skipWords" class="small"></span>. Never skipped: not, no, never, without, may, will, must, over, under, more, less, he, she, we and the other words for people.</li>
+    <li><b>Word forms.</b> Capitals and simple plurals are evened out ("Rates" matches "rate", "companies" matches "company"). Nothing else is: "rose" is not "rise", and "approve" is not "approved", so a reworded claim is REFUSED even when it is true.</li>
+    <li><b>Numbers.</b> Compared as written: 12.0 is not 12, and "twelve" is a word, not a number. The unit is not checked: 12% and 12 million both contain 12.</li>
+    <li><b>Quotations.</b> Only double quote marks ("…" or “…”) start a quotation; text in single quotes is checked word by word. Capitals count inside a quotation.</li>
+    <li><b>Other languages.</b> The skipped words are English; other languages are checked word by word. Chinese, Japanese, Thai and other scripts written without spaces count a whole run of text as one word, so they pass only when a run is copied exactly.</li>
+    <li><b>Offsets.</b> Each check gives two pairs of offsets: <i>norm</i>, into the source after spacing and quote marks are evened out, and <i>raw</i>, into the source exactly as given. Raw offsets are left out where the raw text does not slice back to the match, for example an accent typed as its own character, or "…" typed as one character.</li>
+    <li><b>Size.</b> One claim up to 2,000 characters; up to 50 sources and 1,000,000 characters in all. Check a long text one sentence at a time.</li>
+    <li><b>The sources themselves.</b> It confirms the words are in the sources you give it, not that the sources are true, complete or genuine.</li>
+    <li><b>Who calls it.</b> It is a check any agent can call. It becomes a check shared between teams only once other teams' agents call it, and no outside caller is recorded yet.</li>
+  </ul>
+</section>
+
   <footer>
-    CiteLock · kar-citelock. Single static file, no network calls, no
-    accounts. Verifies quote-to-source grounding only — it is one deterministic check
-    among many you should run, not a full fact-check.<br>
-    Agents can run the same check: <a href="https://github.com/sjgant80-hub/kar-citelock">source, agent skill and mutation receipt</a>.
+    CiteLock · kar-citelock. A static page with no accounts: what you paste never leaves your browser, and the only
+    things it fetches are its own files (the gate receipt, the cost figures and the recorded agent call). It checks
+    quotes and claims against their sources only: one deterministic check among the ones you should run, not a full
+    fact-check.<br>
+    Agents can run the same checks: <code>npx -y github:sjgant80-hub/kar-citelock</code> (MCP), or the agent skill. <a href="https://github.com/sjgant80-hub/kar-citelock">Source, tests and mutation receipt</a>. Made by Kar; supplied by <a href="https://www.ai-nativesolutions.com">AI Native Solutions</a>.
     Powered by the Konomi architecture, created by Thomas Frumkin.
   </footer>
 
@@ -1162,7 +1299,9 @@ renderSources();
 renderClaimSourceOptions();
 renderClaims();
 updateRunButton();
+
 </script>
+<script src="claim-page.js"></script>
 <script type="module" src="explain.mjs"></script>
 </body>
 </html>

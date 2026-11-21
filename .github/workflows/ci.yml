@@ -17,6 +17,8 @@ jobs:
         run: node build.mjs --check
       - name: tests (the kernel, the shipped skill script run alone as Agensi runs it, and the MCP server spawned and spoken to)
         run: npm test
+      - name: the recorded agent call on the page is what the server answers today
+        run: node stdio.mjs < trace/mcp-call.in.jsonl | diff - trace/mcp-call.out.jsonl
       - name: the cost case kernel (checkcase.mjs) and its sourced basis
         run: node --test checkcase.test.mjs
       - name: the committed mutation receipt is for this kernel and these tests
@@ -63,6 +65,17 @@ jobs:
           cap: 100000
           node-version: 20
           fuzz: mcp.mjs:handleRpc
+  witness-page:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: witness v0.6 mutation gate on the page's claim-check code (every mutant)
+        uses: sjgant80-hub/witness@v0.6
+        with:
+          files: claim-page.js
+          test-command: node --test page.test.mjs
+          cap: 100000
+          node-version: 20
   npx-from-github:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
