@@ -35,8 +35,8 @@ and the limits). In an MCP client's config:
 
 or in Claude Code: `claude mcp add kar-citelock -- npx -y github:sjgant80-hub/kar-citelock`. `mcp.test.mjs` spawns
 the server and speaks MCP to it; CI also runs that line itself, from GitHub, from an empty folder, on every commit.
-npx needs git on the machine. Started from inside this repository's own folder, npm 10 on GitHub's runner failed with
-"GitFetcher requires an Arborist constructor"; started from any other folder it works.
+npx needs git on the machine. (npm 10 will not run a GitHub package whose package.json has a `build` script, so the
+script that regenerates the kernel is `npm run kernel`.)
 
 ## Use it from an agent
 

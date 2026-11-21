@@ -13,8 +13,8 @@ import { verify, MESH_VERSION } from './kernel.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const NPX = process.env.CITELOCK_MCP_NPX;
-// npx runs from a fresh empty folder, as a stranger's agent would start it. Run from inside this repository's own
-// folder, npm 10 on GitHub's runner failed with "GitFetcher requires an Arborist constructor" (CI run 44917479049).
+// npx runs from a fresh empty folder, as a stranger's agent would start it. npm 10 refuses a GitHub package whose
+// package.json has a "build" script ("GitFetcher requires an Arborist constructor", CI runs 44917479049, 44918608797).
 const SERVER = NPX
   ? ['npx', ['-y', NPX], { shell: process.platform === 'win32', cwd: mkdtempSync(join(tmpdir(), 'citelock-npx-')) }]
   : [process.execPath, [join(HERE, 'stdio.mjs')], { cwd: HERE }];
