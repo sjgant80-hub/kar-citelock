@@ -4,6 +4,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { handleRpc, negotiate, TOOLS, ABOUT, VERSION, PROTOCOLS, DEFAULT_PROTOCOL, INSTRUCTIONS, PAGE, REPO } from './mcp.mjs';
@@ -11,7 +13,11 @@ import { verify, MESH_VERSION } from './kernel.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const NPX = process.env.CITELOCK_MCP_NPX;
-const SERVER = NPX ? ['npx', ['-y', NPX], { shell: process.platform === 'win32' }] : [process.execPath, [join(HERE, 'stdio.mjs')], {}];
+// npx runs from a fresh empty folder, as a stranger's agent would start it. Run from inside this repository's own
+// folder, npm 10 on GitHub's runner failed with "GitFetcher requires an Arborist constructor" (CI run 44917479049).
+const SERVER = NPX
+  ? ['npx', ['-y', NPX], { shell: process.platform === 'win32', cwd: mkdtempSync(join(tmpdir(), 'citelock-npx-')) }]
+  : [process.execPath, [join(HERE, 'stdio.mjs')], { cwd: HERE }];
 
 const SRC = [{ id: 'report', text: 'The board approved the merger on 3 March. Revenue rose 12% in 2025.' }];
 const TRUE = { claim: 'The board approved the merger, and revenue rose 12% [report].', sources: SRC };
@@ -111,7 +117,7 @@ test('stdio: a whole MCP session on stdin gets one answer per request on stdout,
     JSON.stringify(callTool(5, 'about', {})),
   ].join('\n') + '\n';
   const [cmd, args, opts] = SERVER;
-  const r = spawnSync(cmd, args, { ...opts, input, encoding: 'utf8', cwd: HERE, timeout: 120000 });
+  const r = spawnSync(cmd, args, { ...opts, input, encoding: 'utf8', timeout: 120000 });
   assert.equal(r.status, 0, r.stderr);
   const out = lines(r.stdout);
   assert.deepEqual(out.map((m) => m.id), [1, 2, 3, 4, null, 5]);
@@ -126,9 +132,12 @@ test('stdio: a whole MCP session on stdin gets one answer per request on stdout,
 
 test('stdio: it answers each line as it arrives, without waiting for the end of the input', async () => {
   const [cmd, args, opts] = SERVER;
-  const child = spawn(cmd, args, { ...opts, cwd: HERE, stdio: ['pipe', 'pipe', 'pipe'] });
-  let buf = '';
+  const child = spawn(cmd, args, { ...opts, stdio: ['pipe', 'pipe', 'pipe'] });
+  let buf = '', stderr = '';
   const waiting = [];
+  child.stderr.on('data', (d) => { stderr += d; });
+  // a server that dies answers every question still waiting with how it died, so the test fails instead of hanging
+  child.on('close', (code) => { while (waiting.length) waiting.shift()({ closed: code, stderr }); });
   child.stdout.setEncoding('utf8');
   child.stdout.on('data', (d) => {
     buf += d;
