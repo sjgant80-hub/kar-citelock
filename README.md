@@ -73,6 +73,9 @@ upload for the Agensi skill marketplace. CI builds the same ZIP on every push an
   CI re-runs the gate on every push: https://github.com/sjgant80-hub/kar-citelock/actions/workflows/ci.yml
 - **The MCP server:** witness v0.6 made 18 mutants of `mcp.mjs` and 2 of `stdio.mjs`; `mcp.test.mjs` caught all 20,
   with no exemptions, and `handleRpc` never throws on the fuzz battery. CI re-runs both on every push.
+- **A cell of the genome:** `seed.json` and `genome/cell.mjs` (judge = the kernel's `verify()` on a known-true and a
+  known-false claim; lane = a claim with its sources; anything else escalates to Kar). The birth check
+  (`.github/workflows/genome.yml`, sjgant80-hub/estate-genome@v1) admits it as a cell; witness: 2 of 2 mutants caught.
 - **The page code:** `claim-page.js` draws the claim box and the recorded call; `page.test.mjs` loads the page without
   a browser, presses its buttons and compares what it shows with the kernel. witness: 18 of 18 mutants caught, none excused.
 

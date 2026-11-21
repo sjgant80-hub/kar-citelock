@@ -20,7 +20,7 @@
   "files": ["stdio.mjs", "mcp.mjs", "kernel.mjs", "README.md", "LICENSE"],
   "scripts": {
     "kernel": "node build.mjs",
-    "test": "node --test kernel.test.mjs skill.test.mjs mcp.test.mjs page.test.mjs",
+    "test": "node --test kernel.test.mjs skill.test.mjs mcp.test.mjs page.test.mjs genome.test.mjs",
     "zip": "node make-zip.mjs",
     "gate": "node gate.mjs --witness ../witness/witness.mjs",
     "verify-receipt": "node gate.mjs --verify",

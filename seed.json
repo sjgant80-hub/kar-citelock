@@ -1,0 +1,70 @@
+{
+  "genome": "1",
+  "name": "kar-citelock",
+  "kind": "tool",
+  "purpose": "Checks a claim against the sources it cites, with fixed rules and no AI judge: VERIFIED only when every quotation is word for word in a cited source and every content word and number is in a cited source; otherwise REFUSED, with the reason for each failed part and the offsets of every check.",
+  "lane": {
+    "id": "claim-grounding",
+    "accepts": "a claim (text) with the 1 to 50 sources it cites, as {claim, sources}",
+    "refuses": "anything that is not a claim with its sources: questions, requests for an opinion, and judgements of meaning or of whether a source is true"
+  },
+  "interface": {
+    "in": "{\"claim\":\"<text, with optional [id] markers>\",\"sources\":[{\"id\":\"s1\",\"text\":\"<source text>\"}]}",
+    "out": "VERIFIED or REFUSED, the reason for each failed part, and the trace: every quotation, number and content word checked, with the source and the offsets where it was found"
+  },
+  "act": {
+    "run": "node genome/act.mjs"
+  },
+  "judge": {
+    "what": "a claim is verified when the kernel's verify() finds every quotation word for word in a cited source and every content word and number outside the quotations in a cited source",
+    "run": "node genome/judge.mjs",
+    "cases": {
+      "good": {
+        "claim": "Revenue rose 12% in 2025, and the chair said \"we will open two new sites in 2026\" [report].",
+        "sources": [
+          {
+            "id": "report",
+            "text": "Example Co. annual report, 2025. Revenue rose 12% to 4.2 million euros. The chair said: “we will open two new sites in 2026”."
+          }
+        ]
+      },
+      "bad": {
+        "claim": "Revenue rose 21% in 2025, and the chair said \"we will open three new sites in 2026\" [report].",
+        "sources": [
+          {
+            "id": "report",
+            "text": "Example Co. annual report, 2025. Revenue rose 12% to 4.2 million euros. The chair said: “we will open two new sites in 2026”."
+          }
+        ]
+      }
+    }
+  },
+  "boundary": {
+    "run": "node genome/lane.mjs",
+    "inLane": {
+      "claim": "Revenue rose 12% in 2025 [report].",
+      "sources": [
+        {
+          "id": "report",
+          "text": "Example Co. annual report, 2025. Revenue rose 12% to 4.2 million euros. The chair said: “we will open two new sites in 2026”."
+        }
+      ]
+    },
+    "outOfLane": {
+      "question": "Is Example Co. a well-run company?"
+    },
+    "escalate": "kar"
+  },
+  "health": {
+    "run": "node genome/health.mjs"
+  },
+  "tombstone": {
+    "apply": "node genome/tombstone.mjs apply",
+    "restore": "node genome/tombstone.mjs restore"
+  },
+  "provenance": {
+    "repo": "sjgant80-hub/kar-citelock",
+    "by": "Kar, for Simon Gant",
+    "born": "2026-11-21"
+  }
+}
