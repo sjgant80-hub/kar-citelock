@@ -77,10 +77,16 @@ jobs:
           node-version: ${{ matrix.node }}
       - name: which npm
         run: npm --version
-      - name: the install line on the page, run for real on this commit (npx -y github:sjgant80-hub/kar-citelock), no account
+      # The exact line on the page, with no commit pinned: npm 10 cannot run it pinned to a full commit hash
+      # (github:...#<sha> stopped with "GitFetcher requires an Arborist constructor" on npm 10.8.2 and 10.9.9 in run
+      # 44919277606; npm 11.19.1 ran it). So the run checks that main is still this commit, and then runs the plain line.
+      - name: the install line on the page, run for real (npx -y github:sjgant80-hub/kar-citelock), no account
         env:
-          CITELOCK_MCP_NPX: github:sjgant80-hub/kar-citelock#${{ github.sha }}
-        run: node --test mcp.test.mjs
+          CITELOCK_MCP_NPX: github:sjgant80-hub/kar-citelock
+        run: |
+          head=$(git ls-remote https://github.com/sjgant80-hub/kar-citelock refs/heads/main | cut -f1)
+          if [ "$head" != "$GITHUB_SHA" ]; then echo "::notice::main has moved on to $head; the run for that commit tests the npx line"; exit 0; fi
+          node --test mcp.test.mjs
       - name: npm's own log, when npx failed
         if: failure()
         run: tail -n 80 ~/.npm/_logs/*.log
