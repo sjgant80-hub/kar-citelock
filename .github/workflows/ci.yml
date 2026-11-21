@@ -66,12 +66,21 @@ jobs:
   npx-from-github:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node }}
+      - name: which npm
+        run: npm --version
       - name: the install line on the page, run for real on this commit (npx -y github:sjgant80-hub/kar-citelock), no account
         env:
           CITELOCK_MCP_NPX: github:sjgant80-hub/kar-citelock#${{ github.sha }}
         run: node --test mcp.test.mjs
+      - name: npm's own log, when npx failed
+        if: failure()
+        run: tail -n 80 ~/.npm/_logs/*.log
