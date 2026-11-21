@@ -15,7 +15,7 @@ jobs:
           node-version: 20
       - name: one source of truth (live page = kernel.mjs = skill script)
         run: node build.mjs --check
-      - name: tests (the kernel, and the shipped skill script run alone as Agensi runs it)
+      - name: tests (the kernel, the shipped skill script run alone as Agensi runs it, and the MCP server spawned and spoken to)
         run: npm test
       - name: the cost case kernel (checkcase.mjs) and its sourced basis
         run: node --test checkcase.test.mjs
@@ -51,3 +51,27 @@ jobs:
           cap: 100000
           node-version: 20
           fuzz: checkcase.mjs:checkCase checkcase.mjs:figures
+  witness-mcp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: witness v0.6 mutation gate on the MCP server (every mutant)
+        uses: sjgant80-hub/witness@v0.6
+        with:
+          files: mcp.mjs stdio.mjs
+          test-command: node --test mcp.test.mjs
+          cap: 100000
+          node-version: 20
+          fuzz: mcp.mjs:handleRpc
+  npx-from-github:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: the install line on the page, run for real on this commit (npx -y github:sjgant80-hub/kar-citelock), no account
+        env:
+          CITELOCK_MCP_NPX: github:sjgant80-hub/kar-citelock#${{ github.sha }}
+        run: node --test mcp.test.mjs

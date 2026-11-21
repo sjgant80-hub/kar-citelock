@@ -21,6 +21,21 @@ every number is in a cited source. Otherwise it answers **REFUSED**, with one re
 trace lists every check with the source it was found in and its offsets. A claim cites sources with `[id]`
 markers; with no marker it cites them all. It checks words, numbers and offsets; it does not understand meaning.
 
+## Call it from your agent (MCP, no account)
+
+    npx -y github:sjgant80-hub/kar-citelock
+
+That starts an MCP server over stdio (Node.js 20 or later, no dependencies, no network, nothing written to disk) with
+two tools: `verify_claim` (a claim and its sources in; VERIFIED or REFUSED and the trace out) and `about` (the rules
+and the limits). In an MCP client's config:
+
+```json
+{ "mcpServers": { "kar-citelock": { "command": "npx", "args": ["-y", "github:sjgant80-hub/kar-citelock"] } } }
+```
+
+or in Claude Code: `claude mcp add kar-citelock -- npx -y github:sjgant80-hub/kar-citelock`. `mcp.test.mjs` spawns
+the server and speaks MCP to it; CI also runs that line itself, from GitHub, on every commit.
+
 ## Use it from an agent
 
 `SKILL.md` makes this repository an agent skill in the open SKILL.md format (Claude Code, Codex CLI, Cursor and
@@ -41,5 +56,7 @@ upload for the Agensi skill marketplace. CI builds the same ZIP on every push an
 - **Mutation gate:** witness v0.6 made 114 single-operator mutants of `kernel.mjs` and the tests caught
   112; the other 2 are equivalent mutants, reasons in `witness.baseline.json`. Receipt: `receipts/witness.json` (kernel SHA-256 `4a2c9e19f96cec2e…`).
   CI re-runs the gate on every push: https://github.com/sjgant80-hub/kar-citelock/actions/workflows/ci.yml
+- **The MCP server:** witness v0.6 made 18 mutants of `mcp.mjs` and 2 of `stdio.mjs`; `mcp.test.mjs` caught all 20,
+  with no exemptions, and `handleRpc` never throws on the fuzz battery. CI re-runs both on every push.
 
 Powered by the Konomi architecture, created by Thomas Frumkin. MIT licence (see `LICENSE`).

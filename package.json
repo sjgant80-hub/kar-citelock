@@ -1,16 +1,21 @@
 {
   "name": "kar-citelock",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "Deterministic quote and citation verifier, no LLM judge: is each claimed quote really in its source?",
+  "description": "Checks claims and quotes against their sources with fixed rules, no AI judge: VERIFIED or REFUSED, with the offsets. An MCP server any agent can run: npx -y github:sjgant80-hub/kar-citelock",
   "type": "module",
   "license": "MIT",
+  "author": "Kar, for Simon Gant",
+  "homepage": "https://sjgant80-hub.github.io/kar-citelock/",
+  "repository": { "type": "git", "url": "https://github.com/sjgant80-hub/kar-citelock.git" },
   "engines": { "node": ">=20" },
+  "bin": { "kar-citelock": "stdio.mjs" },
   "scripts": {
     "build": "node build.mjs",
-    "test": "node --test kernel.test.mjs skill.test.mjs",
+    "test": "node --test kernel.test.mjs skill.test.mjs mcp.test.mjs",
     "zip": "node make-zip.mjs",
     "gate": "node gate.mjs --witness ../witness/witness.mjs",
-    "verify-receipt": "node gate.mjs --verify"
+    "verify-receipt": "node gate.mjs --verify",
+    "mcp": "node stdio.mjs"
   }
 }
