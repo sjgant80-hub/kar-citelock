@@ -8,7 +8,7 @@ whole-word search + Levenshtein similarity and classifies it **VERIFIED / NEAR M
 run ends in a SHA-256 receipt anyone can reproduce byte-for-byte from the same inputs, plus a
 tamper-evident hash-chained session ledger you can export, edit, and re-import to see the chain break.
 
-One self-contained HTML file — no backend, no network, nothing sent anywhere, runs in your browser.
+A static page (index.html and a few small files of its own) with no backend: nothing you paste is sent anywhere; it runs in your browser.
 
 **Honest limit:** it only confirms text is present in the source *you* supplied — not that the source is
 authentic, nor that a verbatim quote isn't misleading out of context.
