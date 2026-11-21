@@ -234,6 +234,219 @@ async function verifyLedger(entries){
   }
   return { ok: Array.isArray(entries) && checks.every(function(c){ return c.ok; }), checks: checks };
 }
+
+/* ---------- the trust mesh: verify({ claim, sources }) gives VERIFIED or REFUSED, with the grounding trace ---------- */
+// A claim is a sentence (or a few) that an agent says its sources support. VERIFIED needs all three:
+//   1. every quotation in the claim ("...") is word for word in a cited source, at the offsets the trace gives;
+//   2. every content word of the claim outside its quotations is in a cited source;
+//   3. every number of the claim outside its quotations is in a cited source.
+// A claim cites sources with [id] markers; a claim with no marker cites every source given. Anything short of all
+// three is REFUSED, with one reason for each part that failed. No AI judges anything: it checks words, numbers and
+// offsets, and it does not understand meaning.
+var MESH_VERSION = 'citelock-mesh-v1';
+var MESH_MAX_CLAIM = 2000;        // characters in one claim: check a long text one sentence at a time
+var MESH_MAX_SOURCES = 50;
+var MESH_MAX_TEXT = 1000000;      // characters across all the sources of one call
+var MESH_NEAR_MAX = 300;          // a longer quotation is not searched for its closest passage (that search is slow)
+var MESH_ID = /^[A-Za-z0-9_.:-]+$/;
+var MESH_NUMBER = /\d+(?:[.,]\d+)*/g;
+var MESH_WORD = /[\p{L}\p{N}]+(?:'[\p{L}\p{N}]+)*/gu;
+var MESH_QUOTE = /"[^"]*"/g;
+var MESH_CITE = /\[([^\[\]]*)\]/g;
+// Small words a claim may use without its source having them. Not in the list, because leaving them out changes what
+// a claim says: negations (not, no, never, without), words of certainty (may, will, must) and of size or direction
+// (over, under, up, down, more, less), and he, she and the other words for people.
+var MESH_SKIP = new Set(('a an the and or but of to in on at by for from with into onto as than then so if ' +
+  'is are was were be been being am has have had do does did it its they them their theirs this that these those ' +
+  'there here which who whom whose what when where while also very just about ' +
+  'according said says say states stated notes noted wrote writes cited cites').split(' '));
+
+function meshSpaces(s){ return ' '.repeat(s.length); }
+
+// A word folded so a simple plural or possessive matches its singular: "rates" and "rate", "companies" and
+// "company", "board's" and "board". Nothing else is folded: "rose" and "rise" stay different words.
+function meshFold(word){
+  var w = word.toLowerCase();
+  if (w.slice(-2) === "'s") w = w.slice(0, -2);
+  if (w.length > 4 && w.slice(-3) === 'ies') return w.slice(0, -3) + 'y';
+  if (w.length > 3 && w.slice(-1) === 's' && w.slice(-2) !== 'ss') return w.slice(0, -1);
+  return w;
+}
+
+// A number as written, with thousands commas taken out: "1,200,000" and "1200000" are the same number. "3,5" and
+// "12.0" stay as they are written, so 12.0 is not 12.
+function meshNumberKey(tok){ return tok.replace(/,(?=\d{3}(?:\D|$))/g, ''); }
+
+// The numbers and the words of a text, each with its offsets. Numbers are taken out first, so "Q3" gives the number 3
+// and the word "Q", and "COVID-19" gives "COVID" and 19, the same way in a claim and in a source.
+function meshTerms(text){
+  var numbers = [], words = [];
+  for (var m of text.matchAll(MESH_NUMBER)) numbers.push({ text: m[0], key: meshNumberKey(m[0]), start: m.index, end: m.index + m[0].length });
+  for (var w of text.replace(MESH_NUMBER, meshSpaces).matchAll(MESH_WORD)) {
+    words.push({ text: w[0], lower: w[0].toLowerCase(), key: meshFold(w[0]), start: w.index, end: w.index + w[0].length });
+  }
+  return { numbers: numbers, words: words };
+}
+
+// Where each character of the normalised source came from in the source exactly as given. Each character is
+// normalised on its own and the pieces joined; when that does not rebuild the normalised text (a letter and its
+// accent written as two characters, for example), there is no map and the trace gives no raw offsets for that source.
+function meshMap(raw){
+  var out = '', starts = [], ends = [], gap = false, i = 0;
+  for (var ch of raw){
+    var n = normalize(ch);
+    if (n === '') gap = out !== '';
+    else {
+      if (gap){ out += ' '; starts.push(i); ends.push(i); gap = false; }
+      for (var k = 0; k < n.length; k++){ starts.push(i); ends.push(i + ch.length); }
+      out += n;
+    }
+    i += ch.length;
+  }
+  return out === normalize(raw) ? { starts: starts, ends: ends } : null;
+}
+
+// The raw offsets of a stretch [ns, ne) of the normalised source, or null. They are given only when the raw text
+// there normalises back to exactly that stretch, so source.slice(start, end) always shows what was matched.
+function meshRaw(src, ns, ne){
+  if (src.map === undefined) src.map = meshMap(src.raw);
+  if (src.map === null) return null;
+  var a = src.map.starts[ns], b = src.map.ends[ne - 1];
+  return normalize(src.raw.slice(a, b)) === src.norm.slice(ns, ne) ? [a, b] : null;
+}
+
+function meshRefuse(reason){
+  return { verdict: 'REFUSED', algorithm: MESH_VERSION, reasons: [reason],
+    trace: { claim: '', cited: [], checks: [{ kind: 'input', ok: false, reason: reason }], skipped: [], sources: [] } };
+}
+
+// Look a term up in each cited source, in the order the claim cites them; the first source that has it grounds it.
+function meshFind(c, cited, lookup, reason){
+  for (var i = 0; i < cited.length; i++){
+    var hit = lookup(cited[i]);
+    if (hit !== undefined){
+      c.ok = true; c.source = cited[i].id; c.norm = [hit.start, hit.end]; c.raw = meshRaw(cited[i], hit.start, hit.end);
+      return c;
+    }
+  }
+  c.reason = reason;
+  return c;
+}
+
+// The closest passage to a quotation that is not word for word in any cited source: the best NEAR_MATCH from
+// verifyClaim above (the first source wins a tie), or null.
+function meshNear(text, cited){
+  if (text.length > MESH_NEAR_MAX) return null;
+  var best = null;
+  cited.forEach(function(src){
+    var r = verifyClaim(text, src);
+    if (r.verdict === 'NEAR_MATCH' && (best === null || r.similarity > best.similarity)) best = { source: src.id, similarity: r.similarity, excerpt: r.excerpt };
+  });
+  return best;
+}
+
+function meshQuote(text, at, cited){
+  var c = { kind: 'quote', text: text, at: at, ok: false };
+  if (text === '') { c.reason = 'the claim has an empty quotation'; return c; }
+  meshFind(c, cited, function(src){
+    var i = findWhole(src.norm, text);
+    return i === -1 ? undefined : { start: i, end: i + text.length };
+  }, 'the quotation "' + text + '" is not word for word in any cited source');
+  if (c.ok) return c;
+  var near = meshNear(text, cited);
+  if (near !== null){
+    c.closest = near;
+    c.reason += '; the closest passage, in source ' + near.source + ', is ' + (near.similarity * 100).toFixed(1) + '% alike: ' + near.excerpt;
+  }
+  return c;
+}
+
+function meshVerify(input){
+  if (input === null || typeof input !== 'object') return meshRefuse('the input must be an object: { claim, sources }');
+  var list = input.sources;
+  if (typeof input.claim !== 'string') return meshRefuse('the claim must be text');
+  if (input.claim.length > MESH_MAX_CLAIM) return meshRefuse('the claim is longer than ' + MESH_MAX_CLAIM + ' characters: check it one sentence at a time');
+  if (!Array.isArray(list) || list.length === 0 || list.length > MESH_MAX_SOURCES) return meshRefuse('sources must be a list of 1 to ' + MESH_MAX_SOURCES + ' sources');
+  var sources = [], total = 0;
+  for (var i = 0; i < list.length; i++){
+    var s = list[i], obj = s !== null && typeof s === 'object';
+    var text = obj ? s.text : s;
+    if (typeof text !== 'string') return meshRefuse('source ' + (i + 1) + ' has no text');
+    var id = obj && s.id !== undefined ? String(s.id) : String(i + 1);
+    if (!MESH_ID.test(id)) return meshRefuse('source ' + (i + 1) + ': an id may only use letters, digits and . _ : -');
+    if (sources.some(function(x){ return x.id === id; })) return meshRefuse('two sources have the id ' + id);
+    total += text.length;
+    if (total > MESH_MAX_TEXT) return meshRefuse('the sources add up to more than ' + MESH_MAX_TEXT + ' characters');
+    var norm = normalize(text), t = meshTerms(norm), words = new Map();
+    t.words.forEach(function(w){ if (!words.has(w.key)) words.set(w.key, w); });
+    sources.push({ id: id, raw: text, norm: norm, numbers: t.numbers, words: words, map: undefined });
+  }
+
+  var claim = normalize(input.claim), checks = [], cited = [], marked = false;
+  // citations first: [s1] or [s1, s2] outside the quotations. A bracket that is not a list of ids ("[the board]") is text.
+  var rest = claim.replace(MESH_QUOTE, meshSpaces).replace(MESH_CITE, function(whole, inner, at){
+    var ids = inner.split(',').map(function(x){ return x.trim(); });
+    if (!ids.every(function(x){ return MESH_ID.test(x); })) return whole;
+    marked = true;
+    ids.forEach(function(x){
+      var src = sources.find(function(y){ return y.id === x; });
+      var c = { kind: 'cite', text: x, at: [at, at + whole.length], ok: src !== undefined };
+      if (src === undefined) c.reason = 'the claim cites [' + x + '], which is not one of the sources given';
+      else if (cited.indexOf(src) === -1) cited.push(src);
+      checks.push(c);
+    });
+    return meshSpaces(whole);
+  });
+  if (!marked) cited = sources;
+
+  // 1. each quotation, word for word
+  for (var q of claim.matchAll(MESH_QUOTE)) checks.push(meshQuote(normalize(q[0].slice(1, -1)), [q.index, q.index + q[0].length], cited));
+  var stray = rest.indexOf('"');
+  if (stray !== -1) checks.push({ kind: 'quote', text: '"', at: [stray, stray + 1], ok: false, reason: 'the claim opens a quotation and never closes it' });
+
+  // 2 and 3. each number and each content word outside the quotations, once each
+  var terms = meshTerms(rest), seenNumbers = new Set(), seenWords = new Set(), skipped = [];
+  terms.numbers.forEach(function(n){
+    if (seenNumbers.has(n.key)) return;
+    seenNumbers.add(n.key);
+    checks.push(meshFind({ kind: 'number', text: n.text, at: [n.start, n.end], ok: false }, cited,
+      function(src){ return src.numbers.find(function(x){ return x.key === n.key; }); },
+      'the number ' + n.text + ' is not in any cited source'));
+  });
+  terms.words.forEach(function(w){
+    if (w.text.length < 2 || MESH_SKIP.has(w.lower)){
+      if (skipped.indexOf(w.lower) === -1) skipped.push(w.lower);
+      return;
+    }
+    if (seenWords.has(w.key)) return;
+    seenWords.add(w.key);
+    checks.push(meshFind({ kind: 'word', text: w.text, at: [w.start, w.end], ok: false }, cited,
+      function(src){ return src.words.get(w.key); },
+      'the word "' + w.text + '" is not in any cited source'));
+  });
+
+  var reasons = [];
+  checks.forEach(function(c){ if (!c.ok) reasons.push(c.reason); });
+  if (!checks.some(function(c){ return c.kind !== 'cite'; })) reasons.push('nothing to check: the claim has no quotation, no content word and no number');
+  return {
+    verdict: reasons.length === 0 ? 'VERIFIED' : 'REFUSED',
+    algorithm: MESH_VERSION,
+    reasons: reasons,
+    trace: {
+      claim: claim,
+      cited: cited.map(function(x){ return x.id; }),
+      checks: checks,
+      skipped: skipped,
+      sources: sources.map(function(x){ return { id: x.id, length: x.raw.length }; })
+    }
+  };
+}
+
+// The one entry point. It never throws: input it cannot read is REFUSED with the reason.
+function verify(input){
+  try { return meshVerify(input); }
+  catch (e) { return meshRefuse('the input could not be read'); }
+}
 // ---- CLI (from cli.mjs) ----
 // cli.mjs — CiteLock on the command line. build.mjs bundles this with the KERNEL block of index.html into
 // scripts/kar-citelock.mjs, the single file the Agensi skill runs. It reads one JSON input (a file, or `-`

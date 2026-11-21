@@ -7,13 +7,13 @@
   "sha256": "9918297aa5f8fc4e1d26d9e6b25226f56102fdc04f0c634155bfcba1c086ef48"
  },
  "kernel": "kernel.mjs",
- "kernelSha256": "74f090443842ff5d279769920880f3106358b99590b1090348a3c4c15cdca77e",
+ "kernelSha256": "4a2c9e19f96cec2e98b204aa604374c4f3209678871f4ca33ab4342221682df2",
  "tests": "node --test kernel.test.mjs",
- "testsSha256": "5c067493696a41bfb6fe359da65da3f1d862279d9809bcad491fdaf812ef66d9",
+ "testsSha256": "871252f96790413cdba587823e72f82a90534f5c2de2bdc1fec82d3437be59f7",
  "node": "v25.7.0",
  "platform": "win32",
- "total": 53,
- "killed": 51,
+ "total": 114,
+ "killed": 112,
  "survived": [],
  "ignored": [
   {
@@ -32,6 +32,6 @@
  "capped": false,
  "timeoutMs": 60000,
  "clean": true,
- "seconds": 409,
+ "seconds": 443,
  "rerun": "git clone https://github.com/sjgant80-hub/witness && git -C witness checkout v0.6 && node gate.mjs --witness witness/witness.mjs"
 }

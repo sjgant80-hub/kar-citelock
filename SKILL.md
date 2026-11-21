@@ -100,8 +100,8 @@ machine, and no language model judges anything.
   tests, the byte-identity check, the receipt check, the witness mutation gate and the ZIP build, and prints
   the ZIP's SHA-256.
 - **The mutation gate:** witness v0.6 (https://github.com/sjgant80-hub/witness, tag `v0.6`) made
-  53 single-operator changes (mutants) to the kernel and the tests caught 51 of them. The other 2 are equivalent mutants: they cannot change behaviour, and each has its measured reason in `witness.baseline.json`. The receipt is
-  `receipts/witness.json` in the repository, for kernel SHA-256 `74f090443842ff5d279769920880f3106358b99590b1090348a3c4c15cdca77e`. With the repository and
+  114 single-operator changes (mutants) to the kernel and the tests caught 112 of them. The other 2 are equivalent mutants: they cannot change behaviour, and each has its measured reason in `witness.baseline.json`. The receipt is
+  `receipts/witness.json` in the repository, for kernel SHA-256 `4a2c9e19f96cec2e98b204aa604374c4f3209678871f4ca33ab4342221682df2`. With the repository and
   witness v0.6 side by side, `node gate.mjs --witness ../witness/witness.mjs` re-runs it.
 
 ## Where it stops

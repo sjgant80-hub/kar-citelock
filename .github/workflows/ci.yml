@@ -38,7 +38,7 @@ jobs:
           test-command: node --test kernel.test.mjs
           cap: 100000
           node-version: 20
-          fuzz: kernel.mjs:verifyClaim kernel.mjs:verifyLedger kernel.mjs:normalize
+          fuzz: kernel.mjs:verifyClaim kernel.mjs:verifyLedger kernel.mjs:normalize kernel.mjs:verify
   witness-checkcase:
     runs-on: ubuntu-latest
     steps:
