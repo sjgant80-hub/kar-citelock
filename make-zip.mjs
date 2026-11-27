@@ -5,8 +5,7 @@
 //
 // Before it writes anything it checks the rules Agensi publishes (https://www.agensi.io/docs/packaging,
 // /docs/review-and-approval, /security) and our own (no prices anywhere; the Konomi credit on the repo's
-// README and page), and refuses to build a package that breaks one. The credit is kept OFF the package
-// itself (SKILL.md, script) until Simon decides whether it allows commercial sale.
+// README, its page and the package's SKILL.md), and refuses to build a package that breaks one.
 //
 //   node make-zip.mjs            check, then write dist/<name>.zip and print its SHA-256
 //   node make-zip.mjs --check    check only
@@ -72,7 +71,7 @@ export function check(files, read) {
     if (sentences > 3) errors.push(`SKILL.md: description is ${sentences} sentences; Agensi's format asks for one to three`);
     if (fields.summary && fields.summary.length > 300) errors.push(`SKILL.md: summary is ${fields.summary.length} characters; the Agensi form takes 300`);
     if (body.trim().length < 200) errors.push('SKILL.md: the body has no real instructions');
-    if (KONOMI.test(read('SKILL.md'))) errors.push('SKILL.md: the Konomi credit is held off sale packages until Simon decides');
+    if (!KONOMI.test(read('SKILL.md'))) errors.push('SKILL.md: the Konomi credit is missing');
     if (/\bestate\b|karma-didy|\bprime \d|\u03BA|\u25CA/i.test(read('SKILL.md'))) errors.push('SKILL.md: internal wording (estate, karma-didy, prime, the seed mark)');
     if (/\{\{[A-Z_]+\}\}/.test(read('SKILL.md'))) errors.push('SKILL.md: an unfilled {{PLACEHOLDER}}');
     // what SKILL.md tells a buyer about the mutation gate must be what the committed receipt says
@@ -100,7 +99,6 @@ export function check(files, read) {
       const logic = text.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
       notes.push(`${f}: ${Buffer.byteLength(text)} bytes, about ${Buffer.byteLength(logic)} without comments (Agensi's review guideline: logic under 20 KB)`);
       if (/\bestate\b|karma-didy|\bprime \d|\u03BA|\u25CA/i.test(text)) errors.push(`${f}: internal wording (estate, karma-didy, prime, the seed mark) in a shipped script`);
-      if (KONOMI.test(text)) errors.push(`${f}: the Konomi credit is held off sale packages until Simon decides`);
     }
   }
   if (files.length > 1000) errors.push('more than 1,000 files');
